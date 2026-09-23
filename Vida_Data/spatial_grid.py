@@ -41,11 +41,13 @@ class SpatialGrid(object):
         ###the column and row of the cell a point is in
         return (math.floor(x / self.cellSize), math.floor(y / self.cellSize))
 
-    def near(self, x, y, distance):
+    def near(self, x, y, distance, firstN=None):
         ###Every object whose centre is within distance of x,y, in the same
         ###order as the list the grid was made from. It can also include a few
         ###that are a little further away (in the same cells), so check each
         ###one properly afterwards.
+        ###If firstN is given, only objects among the first firstN in the list
+        ###are included.
         found = []
         if not (math.isfinite(x) and math.isfinite(y) and math.isfinite(distance)):
             #not a real position or distance: everything counts as near
@@ -65,5 +67,6 @@ class SpatialGrid(object):
         found.sort()
         nearObjects = []
         for position, anObject in found:
-            nearObjects.append(anObject)
+            if firstN==None or position<firstN:
+                nearObjects.append(anObject)
         return nearObjects

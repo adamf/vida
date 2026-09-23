@@ -103,6 +103,14 @@ def determineShade(theGarden):
         print("***Generating lists of overlapping plants. This could take a while...***")
         theProgressBar= progressBarClass.progressbarClass(len(theGarden.soil),"*")
         i=0
+    ###A grid of everything in the soil, to find the objects near each plant
+    ###quickly (see spatial_grid.py), and the largest radius, which is how far
+    ###away something can be and still overlap a plant.
+    largestRadius=0.0
+    for anObject in theGarden.soil:
+        if anObject.r>largestRadius:
+            largestRadius=anObject.r
+    grid=spatial_grid.SpatialGrid(theGarden.soil, max(2.0*largestRadius, 1.0))
     ###populate the overlap list
     theIndex=0
     for plantOne in theGarden.soil:
@@ -118,14 +126,24 @@ def determineShade(theGarden):
             #        plantOne.overlapList.remove(overlappingItem)
             ###need to insert something so tallest plant looks at all the other plants of exactly the same size
             ###if they are the same size and overlapping, they need to share shading
-            for plantTwo in range(theIndex):
-                plantTwo=theGarden.soil[plantTwo]
+            ###Each plant is checked against the first theIndex objects in the soil,
+            ###where theIndex is the number of plants done so far. The grid gives
+            ###just the ones of those near enough to overlap (a little further, to
+            ###be safe with rounding), in the same order.
+            reach=(plantOne.r+largestRadius)*1.000001+0.000001
+            for plantTwo in grid.near(plantOne.x, plantOne.y, reach, theIndex):
                 ###is plant two overlapping you?
                 overlapStatus=geometry_utils.checkOverlap(plantOne.x, plantOne.y, plantOne.r, plantTwo.x, plantTwo.y, plantTwo.r)
                 if overlapStatus>0:
                     if not plantTwo in plantOne.overlapList:
                         if not plantTwo==plantOne:
                             plantOne.overlapList.append(plantTwo)
+            if theIndex>0:
+                ###This loop used to go through all of the first theIndex objects,
+                ###so it finished with plantTwo being the last of them. The shading
+                ###below uses plantTwo.canopyTransmittance for plants shaded by just
+                ###one other plant, so plantTwo is set the same way here.
+                plantTwo=theGarden.soil[theIndex-1]
             ###sort the overlap list by height of the plants. Ordered shortest to tallest
             #plantOne.overlapList = list_utils.sort_by_attr(plantOne.overlapList, "heightStem")
             ###use absHeightStem, which is stem heigh + elevetion

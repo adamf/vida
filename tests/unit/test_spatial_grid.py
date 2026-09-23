@@ -5,6 +5,8 @@ import random
 
 import pytest
 
+import geometry_utils
+import list_utils
 import spatial_grid
 import vworldr
 
@@ -67,3 +69,74 @@ def test_the_grid_finds_exactly_the_same_overlaps(in_repo_root, seed):
         without_grid = world.checkForOverlap(thing)
         with_grid = world.checkForOverlap(thing, grid, largestRadius)
         assert with_grid == without_grid
+
+
+class ShadeThing:
+    """Just enough of a plant or seed for determineShade."""
+
+    def __init__(self, rng, isSeed):
+        self.x = rng.uniform(-10, 10)
+        self.y = rng.uniform(-10, 10)
+        self.isSeed = isSeed
+        self.r = rng.uniform(0.01, 0.05) if isSeed else rng.uniform(0.1, 2.0)
+        self.absHeightStem = 0.0 if isSeed else rng.uniform(0.5, 20.0)
+        self.canopyTransmittance = rng.choice([0.0, 0.02, 0.3, 0.6])
+        self.minimumLightForGermination = 0.0
+        self.colourLeaf = [100.0, 1.0, 1.0]
+        self.subregion = []
+        self.overlapList = []
+        self.areaCovered = 0.0
+        self.name = "thing"
+
+
+class ShadeWorld:
+    def __init__(self, soil):
+        self.soil = soil
+        self.showProgressBar = False
+        self.lightIntensity = 1.0
+
+
+def expected_overlaps(soil):
+    """determineShade's first step done the slow way: each plant against the
+    first theIndex objects in the soil, where theIndex is plants done so far."""
+    expected = {}
+    theIndex = 0
+    last_looked_at = None
+    for plant in soil:
+        if not plant.isSeed:
+            found = []
+            for j in range(theIndex):
+                other = soil[j]
+                last_looked_at = other
+                if geometry_utils.checkOverlap(plant.x, plant.y, plant.r, other.x, other.y, other.r) > 0:
+                    found.append(other)
+            found = list_utils.sort_by_attr(found, "absHeightStem")
+            found.reverse()
+            expected[id(plant)] = found
+            theIndex = theIndex + 1
+    return expected, last_looked_at
+
+
+@pytest.mark.parametrize("seed", [4, 5, 6])
+def test_shading_finds_exactly_the_same_overlaps(seed):
+    rng = random.Random(seed)
+    soil = []
+    for i in range(1500):
+        soil.append(ShadeThing(rng, isSeed=rng.random() < 0.3))
+    expected, last_looked_at = expected_overlaps(soil)
+
+    random.seed(seed)
+    vworldr.determineShade(ShadeWorld(soil))
+
+    for plant in soil:
+        if not plant.isSeed:
+            assert plant.overlapList == expected[id(plant)]
+            if len(plant.overlapList) == 1:
+                # shaded by one other plant: uses the transmittance of the last
+                # object the first step looked at (see determineShade)
+                over = plant.overlapList[0]
+                total = geometry_utils.areaCircle(plant.r)
+                covered = geometry_utils.areaOverlappingCircles(plant.x, plant.y, plant.r, over.x, over.y, over.r)
+                covered = covered - covered * last_looked_at.canopyTransmittance
+                exposed = (total - covered) / total
+                assert plant.areaCovered == total - total * exposed
