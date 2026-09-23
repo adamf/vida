@@ -151,8 +151,7 @@ The recordings were made on Linux with Python 3.11, the version in
 
 * **Python 3.12 and 3.13** produce exactly the same simulation, but the
   statistics files from `vextract.py` differ in the last digit: Python 3.12
-  changed how `sum()` adds up floats. Dispersal method 0 also fails
-  differently (see below).
+  changed how `sum()` adds up floats.
 * **macOS and Windows** have their own maths libraries, which can round a few
   functions differently in the last digit. If exact comparison fails there,
   `VIDA_CHARACTERIZATION_RTOL=1e-9 pytest` compares floats with a tolerance
@@ -174,8 +173,9 @@ been fixed since, and each now has a scenario that uses the feature.
    dispersal methods read `theDistance`, which only methods 3 and 4 set
    (`vplantr.py`, `disperseSeed`). Every species in the repository uses
    method 4.
-4. Dispersal method 0 passes floats to `random.randrange()`; on Python 3.12+
-   that is a `TypeError` (it fails before reaching bug 3).
+4. Fixed: dispersal method 0 passed floats to `random.randrange()`. That is
+   a `TypeError` on Python 3.12+, and on 3.11 it was already a `ValueError`
+   for worlds of odd size.
 
 Also noticed, but not crashes: in `disperseSeed`, the terrain binary search
 calls `elevationFromPixel(thePixelValue)` without `theGarden.maxElevation`,

@@ -297,8 +297,9 @@ class genericPlant(object):
         ###this dispersal method needs to be better
         if motherPlant.seedDispersalMethod[0]==0:
             ###This is just random anywhere in world###
-            newX =random.randrange(-(theGarden.theWorldSize/2),(theGarden.theWorldSize/2))+random.random()
-            newY =random.randrange(-(theGarden.theWorldSize/2),(theGarden.theWorldSize/2))+random.random()
+            #randrange needs whole numbers (the same as placeSeed in vworldr.py)
+            newX =random.randrange(-int(theGarden.theWorldSize/2),int(theGarden.theWorldSize/2))+random.random()
+            newY =random.randrange(-int(theGarden.theWorldSize/2),int(theGarden.theWorldSize/2))+random.random()
         elif motherPlant.seedDispersalMethod[0]==1:
             ###just drop the seed straight down###
             newX=theSeed.x
