@@ -8,6 +8,7 @@
 //   loading        read the file (unzipping .gz files) into `run`
 //   colours        which colour each species gets
 //   drawing        the map from above, the side view and the two charts
+//   scene          the natural scene in 3D (drawn by scene.js)
 //   interaction    play/pause, the slider, hovering, and keyboard keys
 
 "use strict";
@@ -18,6 +19,9 @@ var playTimer = null;        // set while playing
 var colourBy = "species";    // "species" or "light"
 var highlightSpecies = -1;   // a species number, or -1 for all species
 var hoverTargets = {};       // what the pointer can hover over, per canvas
+var viewMode = "plan";       // "plan" (map and side view) or "scene" (3D)
+var sceneReady = false;      // the 3D scene has been set up
+var sceneRun = null;         // the run the 3D scene was last set up for
 var chartHover = {};         // the cycle the pointer is over, per chart
 
 // The palette gives three categorical colours (see viewer.css); species past
@@ -920,12 +924,77 @@ function drawEverything() {
   document.getElementById("cycle-label").textContent =
     "Cycle " + cycle.cycle + " of " + run.cycles[run.cycles.length - 1].cycle;
   drawStats();
-  drawMap();
-  drawSide();
+  if (viewMode === "scene") {
+    drawScene();
+  } else {
+    drawMap();
+    drawSide();
+  }
   drawLineChart("population-canvas", populationLines());
   drawLineChart("species-canvas", speciesLines());
   drawLegends();
   drawTables();
+}
+
+// ---------------------------------------------------------------------------
+// The natural scene (3D)
+// ---------------------------------------------------------------------------
+
+function drawScene() {
+  if (!sceneReady) {
+    return;
+  }
+  if (sceneRun !== run) {
+    sceneSetRun(run);
+    sceneRun = run;
+  }
+  sceneShowCycle(run, run.cycles[cycleIndex],
+    { colourBy: colourBy, highlight: highlightSpecies, lightColour: lightColour });
+}
+
+function loadThree(whenLoaded) {
+  // three.js is only loaded the first time the scene is shown
+  if (typeof THREE !== "undefined") {
+    whenLoaded(true);
+    return;
+  }
+  var script = document.createElement("script");
+  script.src = "lib/three.min.js";
+  script.addEventListener("load", onLoaded);
+  script.addEventListener("error", onFailed);
+  function onLoaded() {
+    whenLoaded(true);
+  }
+  function onFailed() {
+    whenLoaded(false);
+  }
+  document.head.appendChild(script);
+}
+
+function setView(mode) {
+  viewMode = mode;
+  document.getElementById("view-select").value = mode;
+  document.getElementById("scene-card").hidden = mode !== "scene";
+  document.querySelector(".views").hidden = mode === "scene";
+  if (mode === "scene" && !sceneReady) {
+    loadThree(onThreeLoaded);
+  } else {
+    if (sceneReady) {
+      sceneResize();
+    }
+    drawEverything();
+  }
+}
+
+function onThreeLoaded(loaded) {
+  if (!loaded || !sceneStart(document.getElementById("scene-box"))) {
+    document.getElementById("scene-note").textContent =
+      "This browser can't draw the 3D scene (it needs WebGL, and lib/three.min.js next to this page).";
+    return;
+  }
+  sceneReady = true;
+  sceneResize();
+  drawEverything();
 }
 
 // ---------------------------------------------------------------------------
@@ -1097,6 +1166,10 @@ function startViewing(name) {
   highlightSpecies = -1;
   document.getElementById("welcome").hidden = true;
   document.getElementById("viewer").hidden = false;
+  if (sceneReady) {
+    // the scene's box may only now have a size
+    sceneResize();
+  }
   document.title = "Vida viewer: " + (run.header.name || name);
   var slider = document.getElementById("cycle-slider");
   slider.max = String(run.cycles.length - 1);
@@ -1168,6 +1241,10 @@ function setUp() {
       play();
     }
   }
+  document.getElementById("view-select").addEventListener("change", onViewChosen);
+  function onViewChosen(event) {
+    setView(event.target.value);
+  }
   document.getElementById("colour-select").addEventListener("change", onColourBy);
   function onColourBy(event) {
     colourBy = event.target.value;
@@ -1204,7 +1281,13 @@ function setUp() {
   }
 
   document.addEventListener("keydown", onKey);
-  window.addEventListener("resize", drawEverything);
+  window.addEventListener("resize", onResize);
+  function onResize() {
+    if (sceneReady) {
+      sceneResize();
+    }
+    drawEverything();
+  }
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", onSystemTheme);
   function onSystemTheme() {
     updateThemeButton();
@@ -1232,8 +1315,21 @@ function setUp() {
   }
 
   updateThemeButton();
-  // viewer/index.html?data=path/to/viewer.jsonl opens that file straight away
-  var dataUrl = new URLSearchParams(window.location.search).get("data");
+  // viewer/index.html?data=path/to/viewer.jsonl opens that file straight away,
+  // and &view=scene starts in the natural scene. A page that can't use the
+  // address can set the same with <div id="viewer-options" data-load="..."
+  // data-view="scene" hidden></div>.
+  var address = new URLSearchParams(window.location.search);
+  var dataUrl = address.get("data");
+  var startView = address.get("view");
+  var options = document.getElementById("viewer-options");
+  if (options) {
+    dataUrl = dataUrl || options.dataset.load;
+    startView = startView || options.dataset.view;
+  }
+  if (startView === "scene") {
+    setView("scene");
+  }
   if (dataUrl) {
     loadUrl(dataUrl);
   }
