@@ -18,4 +18,6 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Check every Python file compiles
+        run: python -m compileall -q -x '/\.git/' .
       - run: pytest -n auto
