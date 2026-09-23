@@ -395,24 +395,28 @@ class genericPlant(object):
         else:
             theElevation = 0.0
         newZ = theElevation
-        theMin = 0.0
-        theMax = theDistance
-        while newZ>theSeed.z + motherPlant.elevation:
-            theTestDist = (theMin+theMax)/2.0
-            #theSeed.radiusSeedMultiplier = 20.0            #visual debugging
-            #theSeed.colourSeedDispersed = [0.0, 0.0, 0.0] #visual debugging
-            newX = (math.cos(theAngle)*theTestDist)
-            if theRun<0.0: newX=(0.0-newX)
-            newY = (math.sin(theAngle)*theTestDist)
-            newX=newX+theSeed.x
-            newY=newY+theSeed.y
-            coordAdjust = theGarden.theWorldSize/2.0
-            ##get elevation from pixel value
-            thePixelValue = terrain_utils.getPixelValue(newX-coordAdjust,newY-coordAdjust,theGarden.terrainImage)
-            theElevation = terrain_utils.elevationFromPixel(thePixelValue)
-            newZ = theElevation
-            theMax = theTestDist
-            if round(theMax,3) == round(theMin,3): break
+        #The search moves the landing point back towards the plant, along the
+        #direction the seed was thrown. Only methods 3 and 4 throw seeds in a
+        #direction (theAngle and theDistance), so it is only done for them.
+        if motherPlant.seedDispersalMethod[0]==3 or motherPlant.seedDispersalMethod[0]==4:
+            theMin = 0.0
+            theMax = theDistance
+            while newZ>theSeed.z + motherPlant.elevation:
+                theTestDist = (theMin+theMax)/2.0
+                #theSeed.radiusSeedMultiplier = 20.0            #visual debugging
+                #theSeed.colourSeedDispersed = [0.0, 0.0, 0.0] #visual debugging
+                newX = (math.cos(theAngle)*theTestDist)
+                if theRun<0.0: newX=(0.0-newX)
+                newY = (math.sin(theAngle)*theTestDist)
+                newX=newX+theSeed.x
+                newY=newY+theSeed.y
+                coordAdjust = theGarden.theWorldSize/2.0
+                ##get elevation from pixel value
+                thePixelValue = terrain_utils.getPixelValue(newX-coordAdjust,newY-coordAdjust,theGarden.terrainImage)
+                theElevation = terrain_utils.elevationFromPixel(thePixelValue)
+                newZ = theElevation
+                theMax = theTestDist
+                if round(theMax,3) == round(theMin,3): break
 
         #print "********seed %s be being placed at %f, %f" % (theSeed.name, newX, newY)
         ###Place the seed in xyz space correctly

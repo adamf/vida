@@ -112,7 +112,7 @@ these tests; they only notice changes to the code.
 | `repeat_and_resume` | `-x 2` repeats, resuming with `-r`, and resuming with `-rl` (reloads world preferences). |
 | `species_event` | "Species" events that change a species' parameters part way through a run. |
 | `seed_event_from_file` | A "Seed" event that adds seeds from a placement file part way through a run. |
-| `known_crashes` | Current crashes, pinned so fixing them is a visible change (see below). |
+| `dispersal_methods_0_1_2` | Seed dispersal methods 0, 1 and 2, on flat ground and on terrain. |
 
 The scenarios run about 80-93% of the lines in `vplantr.py`, `vworldr.py` and
 `Vida.py`. The main simulation paths *not* reached are immature seeds failing
@@ -160,17 +160,20 @@ The recordings were made on Linux with Python 3.11, the version in
 
 ## Bugs found while writing these tests
 
-`known_crashes` pins the ones not yet fixed; each fix re-records it.
+When they were found, each crash was pinned in a `known_crashes` scenario,
+so that fixing it was a deliberate change to the recordings. They have all
+been fixed since, and each now has a scenario that uses the feature.
 
 1. Fixed: a `Species` event crashed because `speciesAttrs.remove('name')` was
    called on `dict.keys()`, which has no `remove()` in Python 3.
 2. Fixed: a `Seed` event with a placement file crashed, because
    `speciesIsMissing==True` was a comparison, not an assignment, and the
    name was never defined.
-3. Seed dispersal methods 0, 1 and 2 crash with `UnboundLocalError` when the
-   first seed is dispersed: the terrain code after the dispersal methods reads
-   `theDistance`, which only methods 3 and 4 set (`vplantr.py`,
-   `disperseSeed`). Every species in the repository uses method 4.
+3. Fixed: seed dispersal methods 0, 1 and 2 crashed with `UnboundLocalError`
+   when the first seed was dispersed, because the terrain search after the
+   dispersal methods read `theDistance`, which only methods 3 and 4 set
+   (`vplantr.py`, `disperseSeed`). Every species in the repository uses
+   method 4.
 4. Dispersal method 0 passes floats to `random.randrange()`; on Python 3.12+
    that is a `TypeError` (it fails before reaching bug 3).
 
