@@ -111,6 +111,7 @@ these tests; they only notice changes to the code.
 | `graphics_outputs` | The `.cfdg` (bottom + side view) and 3D `.dxf` files. |
 | `repeat_and_resume` | `-x 2` repeats, resuming with `-r`, and resuming with `-rl` (reloads world preferences). |
 | `species_event` | "Species" events that change a species' parameters part way through a run. |
+| `seed_event_from_file` | A "Seed" event that adds seeds from a placement file part way through a run. |
 | `known_crashes` | Current crashes, pinned so fixing them is a visible change (see below). |
 
 The scenarios run about 80-93% of the lines in `vplantr.py`, `vworldr.py` and
@@ -163,8 +164,9 @@ The recordings were made on Linux with Python 3.11, the version in
 
 1. Fixed: a `Species` event crashed because `speciesAttrs.remove('name')` was
    called on `dict.keys()`, which has no `remove()` in Python 3.
-2. A `Seed` event with a placement file crashes: `speciesIsMissing==True` is a
-   comparison, not an assignment, and the name is never defined.
+2. Fixed: a `Seed` event with a placement file crashed, because
+   `speciesIsMissing==True` was a comparison, not an assignment, and the
+   name was never defined.
 3. Seed dispersal methods 0, 1 and 2 crash with `UnboundLocalError` when the
    first seed is dispersed: the terrain code after the dispersal methods reads
    `theDistance`, which only methods 3 and 4 set (`vplantr.py`,

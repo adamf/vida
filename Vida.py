@@ -930,14 +930,10 @@ def main():
                                         jj=j[0]
                                         #has_key was depreciated and removed from python 3
                                         #STH 2026-0908
-                                        # if (sys.version_info.major)==2:
-                                        #     if not theGarden.platonicSeeds.has_key(jj):
-                                        #         speciesIsMissing==True
-                                        # else:
-                                        #     if not jj in theGarden.platonicSeeds:
-                                        #         speciesIsMissing==True
-                                        if not jj in theGarden.platonicSeeds:
-                                            speciesIsMissing==True
+                                        #Only load species that have a file in Species/. Anything else
+                                        #(such as 'random') is left for placeSeed, which warns and uses
+                                        #a random species instead.
+                                        speciesIsMissing = (not jj in theGarden.platonicSeeds) and os.path.isfile("Species/"+jj)
                                         if speciesIsMissing==True:
                                             if debug == 1: print("debug: Desired species missing from loaded simulation")
                                             if debug == 1: print("debug: Adding species %s" % (jj))
