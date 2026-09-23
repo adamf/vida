@@ -1053,7 +1053,9 @@ def main():
                             if debug: print("debug: Species event detected...")
                             theDict = aItem[aKey][0]
                             theSpeciesName = theDict['name']
-                            speciesAttrs = theDict.keys()
+                            #list() makes a copy that can have 'name' removed from it.
+                            #In python 3, keys() is a view of the dictionary with no remove()
+                            speciesAttrs = list(theDict.keys())
                             #I'm not sure whether the user should be allowed to change the base species name
                             #Why might this be useful? Species evolution/creation of a new subspecies?
                             #STH 2019-0930

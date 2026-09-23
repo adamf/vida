@@ -110,6 +110,7 @@ these tests; they only notice changes to the code.
 | `terrain_water` | Terrain from a folder with an `.xlsx` elevation table, rising water, water and drought tolerance, submerged seeds, seed dispersal over terrain; then a non-square RGB image with command-line elevation settings. |
 | `graphics_outputs` | The `.cfdg` (bottom + side view) and 3D `.dxf` files. |
 | `repeat_and_resume` | `-x 2` repeats, resuming with `-r`, and resuming with `-rl` (reloads world preferences). |
+| `species_event` | "Species" events that change a species' parameters part way through a run. |
 | `known_crashes` | Current crashes, pinned so fixing them is a visible change (see below). |
 
 The scenarios run about 80-93% of the lines in `vplantr.py`, `vworldr.py` and
@@ -158,10 +159,10 @@ The recordings were made on Linux with Python 3.11, the version in
 
 ## Bugs found while writing these tests
 
-`known_crashes` pins these; each fix should re-record it.
+`known_crashes` pins the ones not yet fixed; each fix re-records it.
 
-1. A `Species` event crashes: `speciesAttrs.remove('name')` is called on
-   `dict.keys()`, which has no `remove()` in Python 3 (Vida.py, Species event).
+1. Fixed: a `Species` event crashed because `speciesAttrs.remove('name')` was
+   called on `dict.keys()`, which has no `remove()` in Python 3.
 2. A `Seed` event with a placement file crashes: `speciesIsMissing==True` is a
    comparison, not an assignment, and the name is never defined.
 3. Seed dispersal methods 0, 1 and 2 crash with `UnboundLocalError` when the
