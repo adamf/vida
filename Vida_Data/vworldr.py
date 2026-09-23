@@ -19,6 +19,7 @@ import geometry_utils
 import list_utils
 import yaml #pip install PyYAML #https://pypi.org/project/PyYAML/
 import progressBarClass
+import spatial_grid
 
 ###experimental terrain import
 ###STH & EKT 05 Feb 2020
@@ -397,11 +398,28 @@ class garden(object):
             return 0
     
     
-    def checkForOverlap(self, theObject):
+    def makeOverlapGrid(self):
+        ###A grid of everything in the soil, so checkForOverlap can find what is
+        ###near an object quickly. Also gives the largest seed or stem radius,
+        ###which is how far away something can be and still touch an object.
+        largestRadius=0.0
+        for anObject in self.soil:
+            if anObject.isSeed:
+                r=anObject.radiusSeed
+            else:
+                r=anObject.radiusStem
+            if r>largestRadius:
+                largestRadius=r
+        #cells about the size of the biggest stem, and at least a metre
+        cellSize=max(2.0*largestRadius, 1.0)
+        return spatial_grid.SpatialGrid(self.soil, cellSize), largestRadius
+
+    def checkForOverlap(self, theObject, grid=None, largestRadius=0.0):
         #specialized routine for detecting overlaps
         #accepts an object (plant or seed)
         #looks at all objects to see if seeds or stems touch
         #returns a list of objects the query object is touching
+        #grid (from makeOverlapGrid) is optional: it only makes this faster
         theGarden=self
         if theObject.isSeed:
             r=theObject.radiusSeed
@@ -410,7 +428,13 @@ class garden(object):
         theIndex=0
         theOverlapList=[]
         if len(theObject.overlapList)==0:
-            listToCheck=theGarden.soil
+            if grid==None:
+                listToCheck=theGarden.soil
+            else:
+                #only the objects close enough to touch it (a little further, to be
+                #safe with rounding), in the same order as theGarden.soil
+                reach=(r+largestRadius)*1.000001+0.000001
+                listToCheck=grid.near(theObject.x, theObject.y, reach)
         else:
             listToCheck=theObject.overlapList
         for anObject in listToCheck:
@@ -435,12 +459,17 @@ class garden(object):
                 print("***Removing overlapping objects***")
                 theProgressBar= progressBarClass.progressbarClass(len(theGarden.soil),"*")
                 i=0
+            grid=None
             for obj in theGarden.soil[:]:
                 ###seeds and or stems that overlap are violating physics.
                 ##Rules about overlapping objects:
                 #####1.) If 2 objects overlap, the more massive object remains.
                 #####2.) If 2 seeds overlap and they have the same mass, the oldest seed remains.
-                objectList=theGarden.checkForOverlap(obj)
+                #The grid finds the objects near obj quickly. It is made again after
+                #anything is killed, because that changes theGarden.soil.
+                if grid==None:
+                    grid, largestRadius=theGarden.makeOverlapGrid()
+                objectList=theGarden.checkForOverlap(obj, grid, largestRadius)
                 for overlappingObject in objectList:
                     if obj.massTotal>overlappingObject.massTotal:
                         overlappingObject.causeOfDeath="crushed"
@@ -459,6 +488,9 @@ class garden(object):
                             obj.causeOfDeath="overlap violation"
                             theGarden.kill(overlappingObject)
                             break
+                if len(objectList)>0:
+                    #something was killed
+                    grid=None
                 if theGarden.showProgressBar:
                     i=i+1
                     theProgressBar.update(i)
