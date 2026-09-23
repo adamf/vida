@@ -146,16 +146,18 @@ recordings are committed. `-m` (population cap) helps.
 
 ## Platforms and Python versions
 
-The recordings were made on Linux with Python 3.11, the version in
-`environment.yml`, and CI checks them there.
+The recordings were made on Linux, and CI checks them there with Python
+3.11, 3.12 and 3.13, which all give exactly the same results.
 
-* **Python 3.12 and 3.13** produce exactly the same simulation, but the
-  statistics files from `vextract.py` differ in the last digit: Python 3.12
-  changed how `sum()` adds up floats.
-* **macOS and Windows** have their own maths libraries, which can round a few
-  functions differently in the last digit. If exact comparison fails there,
-  `VIDA_CHARACTERIZATION_RTOL=1e-9 pytest` compares floats with a tolerance
-  (though a difference that changes a random draw will still show up).
+(Python 3.12 changed the built-in `sum()` to add floats more accurately,
+which changes the last digit of some totals. Vida adds numbers up with
+`list_utils.sum_in_order()` instead, so results do not depend on the
+Python version.)
+
+**macOS and Windows** have their own maths libraries, which can round a few
+functions differently in the last digit. If exact comparison fails there,
+`VIDA_CHARACTERIZATION_RTOL=1e-9 pytest` compares floats with a tolerance
+(though a difference that changes a random draw will still show up).
 
 ## Bugs found while writing these tests
 

@@ -16,6 +16,7 @@ import uuid
 ###append the path to basic data files
 sys.path.append("Vida_Data")
 import geometry_utils
+import list_utils
 import yaml
 
 ###experimental terrain import
@@ -193,7 +194,7 @@ class genericPlant(object):
         self.prevHeightGrowthRate=self.heightStem
         while len(self.heightGrowthRate)>self.numYearsGrowthMemory:
             self.heightGrowthRate.pop(0)
-        self.avgHeightGrowthRate=sum(self.heightGrowthRate)/float(len(self.heightGrowthRate))
+        self.avgHeightGrowthRate=list_utils.sum_in_order(self.heightGrowthRate)/float(len(self.heightGrowthRate))
         if self.avgHeightGrowthRate>self.maxAvgHeightGrowthRate:
             self.maxAvgHeightGrowthRate=self.avgHeightGrowthRate
         self.age=self.age+1
@@ -621,7 +622,7 @@ class genericPlant(object):
  
     def makeSomeSeeds(self, maxSeedsPerPlant, theGarden):
         #make a seed on yourself if you don't have the max number of seeds
-        theNum=float(sum(self.massFixedRecord))
+        theNum=float(list_utils.sum_in_order(self.massFixedRecord))
         theDenom=float(len(self.massFixedRecord))
         ###this addresses a rare bug where theDenom==0.0
         if theDenom<=0:

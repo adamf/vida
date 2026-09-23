@@ -13,7 +13,7 @@ import pytest
 
 from . import harness
 
-# Recordings are made on Linux with Python 3.11. Other platforms can differ
+# Recordings are made on Linux. Other platforms can differ
 # in the last digit of some maths functions; set this (e.g. to 1e-9) to
 # compare floating point numbers with a tolerance instead of exactly.
 RTOL = float(os.environ.get("VIDA_CHARACTERIZATION_RTOL", "0"))
