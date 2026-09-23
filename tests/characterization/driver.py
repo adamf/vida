@@ -61,8 +61,10 @@ IGNORED_OBJECT_ATTRS = {"timeCreation", "timeGermination", "timePlanted"}
 ATTACHED_SEED_ATTRS = {"name", "motherPlant", "motherPlantName", "x", "y", "z", "r",
                        "massSeed", "radiusSeed", "elevation"}
 
-# Garden attributes that hold other objects; they are recorded separately.
-GARDEN_CONTAINER_ATTRS = {"soil", "deathNote", "platonicSeeds", "theRegions", "terrainImage"}
+# Garden attributes that hold other objects (recorded separately), and the
+# planting counter, which only numbers seeds in order (like timePlanted).
+GARDEN_CONTAINER_ATTRS = {"soil", "deathNote", "platonicSeeds", "theRegions", "terrainImage",
+                          "plantingCount"}
 
 UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 

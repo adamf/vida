@@ -354,6 +354,12 @@ def main():
     
     print("*********Vida version: %s *********" % (vidaVersion))
 
+    ###Seeding the random number generator makes a run repeatable:
+    ###the same seed and the same settings give exactly the same results.
+    if randomSeed!=None:
+        random.seed(randomSeed)
+        print("     Random seed: %i" % (randomSeed))
+
     CFDGtext=""
     CFDGtextDict={}
 
@@ -406,7 +412,7 @@ def main():
         elif os.path.isdir(terrainFile) == True:
             print("***Checking directory for tif terrain image...***")
             tmpPath = os.path.join(terrainFile,'*.tif') #assumes file suffix is 'tif'
-            matchFiles = glob.glob(tmpPath)
+            matchFiles = sorted(glob.glob(tmpPath)) #sorted so the same file is used on every computer
             #print matchFiles
             if not matchFiles:
                 #no matching files found
@@ -476,7 +482,7 @@ def main():
                 #ET addition 9-15-2020
                 print("***Checking directory for xlsx terrain data...***")
                 tmpPath = os.path.join(terrainFile,'*.xlsx') #assumes file suffix is 'xlsx'
-                matchFiles = glob.glob(tmpPath)
+                matchFiles = sorted(glob.glob(tmpPath)) #sorted so the same file is used on every computer
                 if matchFiles:
                     #9/28/2020 ET-test of default absMax and absMin values from vida.ini                				
                     theExcelFile = matchFiles[0] #no matter what, grab the first item in the list
@@ -539,7 +545,9 @@ def main():
     ####################################
 
     #########Check for multiple species. If none, use default
-    fileList=os.listdir("Species")
+    #sorted, because the order os.listdir gives depends on the computer, and
+    #random species are picked by their place in this list
+    fileList=sorted(os.listdir("Species"))
     ymlList=[]
     pythonList=[]
     useDefaultYml=True
@@ -1292,7 +1300,8 @@ if __name__ == '__main__':
     parser.add_argument('-dd',dest='debug2',action='store_true', required=False, help='Debug level 2')
     parser.add_argument('-c', dest='deleteCfdgFiles', action='store_false', required=False, help='Keep cfdg files')
     parser.add_argument('-p', dest='deletePngFiles', action='store_true', required=False, help='Delete png files')
-    parser.add_argument('-b', dest='showProgressBar', action='store_true', required=False, help='Show progress bars')    
+    parser.add_argument('-b', dest='showProgressBar', action='store_true', required=False, help='Show progress bars')
+    parser.add_argument('-seed', type=int, metavar='int', dest='randomSeed', required=False, help='Seed for the random numbers, so a run can be repeated exactly')    
     #more python2 to python3 fixes
     #STH 2026-0911
     # parser.add_argument('-r', type=open, metavar='file', dest='resumeSim', required=False, help='Load a saved simulation and continue')
