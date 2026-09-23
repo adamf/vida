@@ -25,17 +25,34 @@ class SpatialGrid(object):
         self.cells = {}
         #each cell holds (position in the objects list, object), so that
         #nearby objects can be given back in the same order as that list
-        position = 0
+        self.nextPosition = 0
         for anObject in objects:
-            if math.isfinite(anObject.x) and math.isfinite(anObject.y):
-                theCell = self.cellOf(anObject.x, anObject.y)
-            else:
-                #not a real position (nan or infinite): treat it as near everything
-                theCell = "anywhere"
-            if theCell not in self.cells:
-                self.cells[theCell] = []
-            self.cells[theCell].append((position, anObject))
-            position = position + 1
+            self.add(anObject)
+
+    def add(self, anObject):
+        ###add an object, as if it was added to the end of the list
+        theCell = self.cellFor(anObject)
+        if theCell not in self.cells:
+            self.cells[theCell] = []
+        self.cells[theCell].append((self.nextPosition, anObject))
+        self.nextPosition = self.nextPosition + 1
+
+    def remove(self, anObject):
+        ###take an object out (the rest keep their order)
+        theCell = self.cellFor(anObject)
+        entries = self.cells[theCell]
+        for i in range(len(entries)):
+            if entries[i][1] is anObject:
+                del entries[i]
+                return
+
+    def cellFor(self, anObject):
+        ###the cell an object is filed under
+        if math.isfinite(anObject.x) and math.isfinite(anObject.y):
+            return self.cellOf(anObject.x, anObject.y)
+        else:
+            #not a real position (nan or infinite): treat it as near everything
+            return "anywhere"
 
     def cellOf(self, x, y):
         ###the column and row of the cell a point is in

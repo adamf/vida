@@ -432,6 +432,27 @@ class garden(object):
         cellSize=max(2.0*largestRadius, 1.0)
         return spatial_grid.SpatialGrid(self.soil, cellSize), largestRadius
 
+    def killAndUpdateGrid(self, theObject, grid):
+        ###kill() theObject, and make the same change to a grid made by
+        ###makeOverlapGrid: take the object out, and add any seeds it dropped
+        ###into the soil. Returns the radius of the biggest seed dropped (0.0
+        ###if none), since that could be the new largest radius.
+        if not theObject in self.soil:
+            #it has already died, so kill() does nothing
+            self.kill(theObject)
+            return 0.0
+        numberBefore=len(self.soil)
+        self.kill(theObject)
+        grid.remove(theObject)
+        #kill() removes the object and adds the dropped seeds to the end
+        numberDropped=len(self.soil)-(numberBefore-1)
+        largestDropped=0.0
+        for droppedSeed in self.soil[len(self.soil)-numberDropped:]:
+            grid.add(droppedSeed)
+            if droppedSeed.radiusSeed>largestDropped:
+                largestDropped=droppedSeed.radiusSeed
+        return largestDropped
+
     def checkForOverlap(self, theObject, grid=None, largestRadius=0.0):
         #specialized routine for detecting overlaps
         #accepts an object (plant or seed)
@@ -477,38 +498,34 @@ class garden(object):
                 print("***Removing overlapping objects***")
                 theProgressBar= progressBarClass.progressbarClass(len(theGarden.soil),"*")
                 i=0
-            grid=None
+            #The grid finds the objects near obj quickly. It is kept up to date
+            #as things are killed, by killAndUpdateGrid.
+            grid, largestRadius=theGarden.makeOverlapGrid()
             for obj in theGarden.soil[:]:
                 ###seeds and or stems that overlap are violating physics.
                 ##Rules about overlapping objects:
                 #####1.) If 2 objects overlap, the more massive object remains.
                 #####2.) If 2 seeds overlap and they have the same mass, the oldest seed remains.
-                #The grid finds the objects near obj quickly. It is made again after
-                #anything is killed, because that changes theGarden.soil.
-                if grid==None:
-                    grid, largestRadius=theGarden.makeOverlapGrid()
                 objectList=theGarden.checkForOverlap(obj, grid, largestRadius)
                 for overlappingObject in objectList:
+                    loser=None
                     if obj.massTotal>overlappingObject.massTotal:
                         overlappingObject.causeOfDeath="crushed"
-                        theGarden.kill(overlappingObject)
-                        break
+                        loser=overlappingObject
                     elif obj.massTotal<overlappingObject.massTotal:
                         obj.causeOfDeath="crushed"
-                        theGarden.kill(obj)
-                        break
+                        loser=obj
                     elif obj.massTotal==overlappingObject.massTotal:
                         if obj.timePlanted>overlappingObject.timePlanted:
                             obj.causeOfDeath="overlap violation"
-                            theGarden.kill(obj)
-                            break
+                            loser=obj
                         else:
                             obj.causeOfDeath="overlap violation"
-                            theGarden.kill(overlappingObject)
-                            break
-                if len(objectList)>0:
-                    #something was killed
-                    grid=None
+                            loser=overlappingObject
+                    if loser!=None:
+                        largestDropped=theGarden.killAndUpdateGrid(loser, grid)
+                        largestRadius=max(largestRadius, largestDropped)
+                        break
                 if theGarden.showProgressBar:
                     i=i+1
                     theProgressBar.update(i)
