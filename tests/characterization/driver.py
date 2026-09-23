@@ -79,17 +79,47 @@ _REAL_GLOB = glob.glob
 _REAL_SYSTEM = os.system
 
 
+class Counter:
+    """Counts 1, 2, 3, ... each time next_value() is called."""
+
+    def __init__(self) -> None:
+        self.value = 0
+
+    def next_value(self) -> int:
+        self.value = self.value + 1
+        return self.value
+
+
+_clock = Counter()
+_uuid_counter = Counter()
+
+
+def _fake_time() -> float:
+    return float(_clock.next_value())
+
+
+def _fake_uuid4() -> uuid.UUID:
+    return uuid.UUID(int=_uuid_counter.next_value())
+
+
+def _sorted_listdir(path: str = ".") -> list[str]:
+    return sorted(_REAL_LISTDIR(path))
+
+
+def _sorted_glob(*args: Any, **kwargs: Any) -> list[str]:
+    return sorted(_REAL_GLOB(*args, **kwargs))
+
+
 def install_patches(seed: int) -> None:
+    """Make the next run of Vida repeatable. Called before each stage."""
+    global _clock, _uuid_counter
     random.seed(seed)
-
-    clock = iter(range(1, 10**12))
-    time.time = lambda: float(next(clock))
-
-    uuid_counter = iter(range(1, 10**12))
-    uuid.uuid4 = lambda: uuid.UUID(int=next(uuid_counter))
-
-    os.listdir = lambda path=".": sorted(_REAL_LISTDIR(path))
-    glob.glob = lambda *args, **kwargs: sorted(_REAL_GLOB(*args, **kwargs))
+    _clock = Counter()
+    _uuid_counter = Counter()
+    time.time = _fake_time
+    uuid.uuid4 = _fake_uuid4
+    os.listdir = _sorted_listdir
+    glob.glob = _sorted_glob
     os.system = _system
 
 
@@ -140,6 +170,10 @@ class Recorder:
         if raw not in self.names:
             self.names[raw] = f"#{len(self.names)}"
         return self.names[raw]
+
+    def name_for_match(self, match: re.Match[str]) -> str:
+        """Same as name(), for use with re.sub() on a uuid match."""
+        return self.name(match.group(0))
 
     def value(self, v: Any) -> Any:
         if v is None or isinstance(v, (bool, int, float, str)):
@@ -228,7 +262,7 @@ def normalised_file_hashes(names: Recorder) -> dict[str, str]:
         data = path.read_bytes()
         if path.suffix in {".csv", ".cfdg", ".dxf", ".txt"}:
             text = data.decode("utf-8", errors="replace")
-            text = UUID_RE.sub(lambda m: names.name(m.group(0)), text)
+            text = UUID_RE.sub(names.name_for_match, text)
             data = text.encode()
         hashes[path.as_posix()] = hashlib.sha256(data).hexdigest()
     return hashes
