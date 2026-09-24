@@ -61,11 +61,11 @@ What comes from the simulation is drawn to scale:
 - where each plant stands, and the height of the ground under it;
 - its stem: a cylinder of the stem's height and width, as in Vida's 3D
   (`.dxf`) files;
-- its crown: the top half of a sphere, as wide as the canopy radius, with
-  its top at the top of the stem. It is as deep as it is wide, or, for
-  species with `crownShape: PARA` in their species file, it reaches from
-  `boleHeight` percent of the way down the tree to the top. This is also as
-  in Vida's 3D files;
+- its crown: as wide as the canopy radius, with its top at the top of the
+  stem. With **Crowns: as Vida draws them** it is the top half of a sphere,
+  as deep as it is wide, or, for species with `crownShape: PARA` in their
+  species file, reaching from `boleHeight` percent of the way down the tree
+  to the top, as in Vida's 3D files;
 - the ground, from the terrain file, and the water level;
 - how much light each plant got: leaves are darker where it got less, as in
   Vida's own pictures. **Colour by light received** colours them by it
@@ -76,6 +76,13 @@ What comes from the simulation is drawn to scale:
 
 Everything else is decoration, to make it look like a real place:
 
+- **Crowns: shaped by genus** (the first word of the species name) gives
+  each kind of tree its own outline, keeping the plant's height and canopy
+  radius: pines grow a long bare trunk with the crown near the top, oaks a
+  broad rounded crown, dogwoods a low flat-topped one, sweetgums and
+  blackgums pointed ones, and so on (`CROWN_FORMS` in `scene/trees.js`).
+  Young trees of every kind have fuller, more pointed crowns. Leaf colour
+  also comes from the genus, and pines have needles;
 - a physically based sky (the Preetham model, from three.js's
   `examples/jsm/objects/Sky.js`) with drifting clouds, and a sun you can put
   at any time of day with the **Sun** slider. **overhead, as Vida's light

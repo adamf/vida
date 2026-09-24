@@ -1,12 +1,21 @@
 // Vida viewer, natural scene: the trees.
 //
 // Drawn to scale from the simulation (see the top of scene.js): each stem is
-// a cylinder of the stem's height and width, and each crown is the top half
-// of a sphere as wide as the canopy radius with its top at the top of the
-// stem, as deep as it is wide or, for crownShape PARA, reaching from
-// boleHeight percent of the way down the tree to the top. The crown is
-// filled with clumps of leaves, layer by layer. Leaves are darker when the
-// plant got less light.
+// a cylinder of the stem's height and width, and each crown is as wide as
+// the canopy radius with its top at the top of the stem. The crown is filled
+// with clumps of leaves, layer by layer. Leaves are darker when the plant
+// got less light.
+//
+// The crown's outline can be drawn two ways (the Crowns control):
+//   - as Vida draws it in its 3D (.dxf) files: the top half of a sphere, as
+//     deep as it is wide or, for crownShape PARA, reaching from boleHeight
+//     percent of the way down the tree to the top;
+//   - shaped by genus (the first word of the species name): decoration, so
+//     the kinds of tree can be told apart. A pine grows a long bare trunk
+//     with its crown near the top, an oak a broad rounded crown, a dogwood a
+//     low flat-topped one, a sweetgum a pointed one, and so on (CROWN_FORMS
+//     below). Young trees of every kind have fuller, more pointed crowns.
+//     The height and the canopy radius are still the plant's own.
 //
 // The wind sways the clumps a few centimetres and flutters the leaves, and
 // leaves glow when the sun shines through them from behind: decoration.
@@ -47,6 +56,65 @@ function foliageFor(speciesName) {
     }
   }
   return DEFAULT_FOLIAGE;
+}
+
+// Crown outlines by genus, for grown trees (decoration; see the top of this
+// file). The crown is as wide as the canopy radius where it is widest.
+//   depth:  how much of the tree's height the crown takes up
+//   widest: how far down the crown it is widest (0 at the top, 1 at the bottom)
+//   top:    the shape above the widest point: 1 pointed, 2 round, 4 flat-topped
+//   bottom: the shape below the widest point, the same way
+//   base:   how wide the bottom of the crown is, as a part of the widest
+//   gaps:   how many clumps of leaves are left out, for an open, tufted crown
+var CROWN_FORMS = {
+  Pinus: { depth: 0.36, widest: 0.45, top: 2.2, bottom: 1.6, base: 0.3, gaps: 0.3 },
+  Picea: { depth: 0.85, widest: 0.95, top: 1, bottom: 3, base: 0.85, gaps: 0 },
+  Abies: { depth: 0.85, widest: 0.95, top: 1, bottom: 3, base: 0.85, gaps: 0 },
+  Tsuga: { depth: 0.8, widest: 0.85, top: 1.2, bottom: 2, base: 0.7, gaps: 0.05 },
+  Juniperus: { depth: 0.85, widest: 0.7, top: 1.2, bottom: 2, base: 0.6, gaps: 0 },
+  Taxodium: { depth: 0.7, widest: 0.8, top: 1.1, bottom: 2, base: 0.6, gaps: 0.1 },
+  Gymnosperm: { depth: 0.8, widest: 0.9, top: 1.1, bottom: 2, base: 0.7, gaps: 0.05 },
+  Acer: { depth: 0.66, widest: 0.5, top: 2, bottom: 2, base: 0.3, gaps: 0.05 },
+  Quercus: { depth: 0.6, widest: 0.5, top: 2.6, bottom: 1.8, base: 0.35, gaps: 0.12 },
+  Carya: { depth: 0.55, widest: 0.45, top: 1.8, bottom: 2, base: 0.35, gaps: 0.1 },
+  Cornus: { depth: 0.72, widest: 0.3, top: 4, bottom: 1.5, base: 0.35, gaps: 0.1 },
+  Liquidambar: { depth: 0.62, widest: 0.8, top: 1.25, bottom: 2, base: 0.5, gaps: 0.05 },
+  Liriodendron: { depth: 0.55, widest: 0.6, top: 1.5, bottom: 2, base: 0.4, gaps: 0.05 },
+  Magnolia: { depth: 0.7, widest: 0.5, top: 2, bottom: 2.5, base: 0.4, gaps: 0 },
+  Nyssa: { depth: 0.6, widest: 0.75, top: 1.35, bottom: 2, base: 0.5, gaps: 0.08 },
+  Prunus: { depth: 0.55, widest: 0.5, top: 2, bottom: 2, base: 0.3, gaps: 0.12 },
+  Fagus: { depth: 0.75, widest: 0.6, top: 2.2, bottom: 2, base: 0.4, gaps: 0.02 },
+  Betula: { depth: 0.6, widest: 0.5, top: 1.6, bottom: 2, base: 0.35, gaps: 0.1 },
+  Castanea: { depth: 0.6, widest: 0.5, top: 2.5, bottom: 1.8, base: 0.35, gaps: 0.08 },
+  Angiosperm: { depth: 0.62, widest: 0.5, top: 2, bottom: 2, base: 0.3, gaps: 0.05 }
+};
+var DEFAULT_BROADLEAF_FORM = CROWN_FORMS.Angiosperm;
+var DEFAULT_CONIFER_FORM = CROWN_FORMS.Gymnosperm;
+// a young tree of any kind: a fuller crown, reaching low, pointed at the top
+var YOUNG_FORM = { depth: 0.85, widest: 0.8, top: 1.4, bottom: 2, base: 0.6, gaps: 0 };
+// Vida's own crown: the top half of a sphere (or of an ellipse, for PARA)
+var VIDA_FORM = { depth: null, widest: 1, top: 2, bottom: 2, base: 1, gaps: 0 };
+
+function crownFormFor(speciesName, needles) {
+  var words = String(speciesName || "").split(/[_\s]+/);
+  for (var i = 0; i < words.length; i++) {
+    if (CROWN_FORMS[words[i]]) {
+      return CROWN_FORMS[words[i]];
+    }
+  }
+  return needles ? DEFAULT_CONIFER_FORM : DEFAULT_BROADLEAF_FORM;
+}
+
+function grownFormAt(form, height) {
+  // A tree's crown form at its height: like a young tree's when small,
+  // becoming its genus's form as it grows from 3 m to 12 m tall.
+  var youth = 1 - smoothStep(3, 12, height);
+  var blended = {};
+  var keys = ["depth", "widest", "top", "bottom", "base", "gaps"];
+  for (var k = 0; k < keys.length; k++) {
+    blended[keys[k]] = form[keys[k]] + (YOUNG_FORM[keys[k]] - form[keys[k]]) * youth;
+  }
+  return blended;
 }
 
 function colourFromHsv(hsv) {
@@ -147,18 +215,36 @@ function clumpLeavesGeometry(cards, cardSize, seed) {
   return geometry;
 }
 
-function crownDepth(species, stemHeight, canopyRadius) {
-  // how far down from the top of the stem the crown reaches (see the top of this file)
+function vidaCrownDepth(species, stemHeight, canopyRadius) {
+  // how far down from the top of the stem Vida's crown reaches (see the top of this file)
   if (species && species.crownShape === "PARA" && species.boleHeight !== null && species.boleHeight !== undefined) {
     return stemHeight * species.boleHeight / 100;
   }
   return canopyRadius;
 }
 
-function widthAt(radius, depth, above) {
-  // the radius of the crown at a height `above` its bottom
-  var fraction = Math.max(0, Math.min(1, above / depth));
-  return radius * Math.sqrt(1 - fraction * fraction);
+function crownFor(state, speciesNumber, species, stemHeight, canopyRadius) {
+  // The outline of one plant's crown: { form, depth } (see the top of this file)
+  if (state.crownForms === "vida") {
+    return { form: VIDA_FORM, depth: vidaCrownDepth(species, stemHeight, canopyRadius) };
+  }
+  var form = grownFormAt(state.crownFormsBySpecies[speciesNumber] || DEFAULT_BROADLEAF_FORM, stemHeight);
+  return { form: form, depth: stemHeight * form.depth };
+}
+
+function widthAt(form, radius, depth, above) {
+  // The radius of the crown at a height `above` its bottom: a curve from
+  // the top down to the widest point, and another from there to the bottom.
+  // (Vida's form is widest at the bottom, so it is all the first curve: the
+  // top half of an ellipse.)
+  var down = 1 - Math.max(0, Math.min(1, above / depth));
+  if (down <= form.widest) {
+    var fromWidest = form.widest > 0 ? (form.widest - down) / form.widest : 0;
+    return radius * Math.pow(1 - Math.pow(fromWidest, form.top), 1 / form.top);
+  }
+  var towardsBottom = (down - form.widest) / (1 - form.widest);
+  var curve = Math.pow(1 - Math.pow(towardsBottom, form.bottom), 1 / form.bottom);
+  return radius * (form.base + (1 - form.base) * curve);
 }
 
 function layerCount(width, size) {
@@ -172,19 +258,20 @@ function layerCount(width, size) {
   return ring;
 }
 
-function estimateClumps(radius, depth, size) {
+function estimateClumps(form, radius, depth, size) {
   var total = 1;
   var step = size * 0.9;
   for (var above = Math.min(depth * 0.5, size * 0.75); above < depth - size * 0.9; above += step) {
-    total += layerCount(widthAt(radius, depth, above), size);
+    total += layerCount(widthAt(form, radius, depth, above), size);
   }
   return total;
 }
 
-function addLayer(clumps, random, x, z, height, width, size, fraction) {
+function addLayer(clumps, random, x, z, height, width, size, fraction, gaps) {
   // one layer of clumps: a ring round the edge of the crown at this height,
   // and one in the middle if the crown is wide there. The last number of
-  // each clump is how far up the crown it is (0 bottom, 1 top).
+  // each clump is how far up the crown it is (0 bottom, 1 top). In an open
+  // crown (gaps) some of the ring is left out.
   var count = layerCount(width, size);
   if (count === 1) {
     var small = Math.max(0.03, Math.min(size, width));
@@ -201,19 +288,23 @@ function addLayer(clumps, random, x, z, height, width, size, fraction) {
   for (var i = 0; i < ring; i++) {
     var angle = phase + (i + (random() - 0.5) * 0.4) / ring * Math.PI * 2;
     var along = reach * (0.9 + random() * 0.1);
-    clumps.push([x + Math.cos(angle) * along, height + (random() - 0.5) * size * 0.6,
-      z + Math.sin(angle) * along, size * (0.8 + random() * 0.2), fraction]);
+    var leaveOut = random() < gaps && ring > 4;
+    if (!leaveOut) {
+      clumps.push([x + Math.cos(angle) * along, height + (random() - 0.5) * size * 0.6,
+        z + Math.sin(angle) * along, size * (0.8 + random() * 0.2), fraction]);
+    }
   }
 }
 
-function crownClumps(x, top, z, radius, depth, clumpBudget) {
+function crownClumps(x, top, z, radius, crown, clumpBudget) {
   // Where to put the clumps of leaves that make up a crown, as
-  // [x, y, z, clump radius, height in the crown], filling the top half of an
-  // ellipsoid `radius` wide and `depth` deep with its top at `top`. The
-  // same plant always gets the same clumps.
+  // [x, y, z, clump radius, height in the crown], filling the crown's
+  // outline (crown.form), `radius` wide at its widest and crown.depth deep,
+  // with its top at `top`. The same plant always gets the same clumps.
   var random = makeRandom(seedFor(x, z));
+  var depth = crown.depth;
   var size = Math.max(0.04, Math.min(1.6, Math.min(radius, depth) * 0.6));
-  var needed = estimateClumps(radius, depth, size);
+  var needed = estimateClumps(crown.form, radius, depth, size);
   if (needed > clumpBudget) {
     size = size * Math.sqrt(needed / clumpBudget);
     size = Math.min(size, Math.min(radius, depth));
@@ -223,7 +314,7 @@ function crownClumps(x, top, z, radius, depth, clumpBudget) {
   var step = size * 0.9;
   var height = base + Math.min(depth * 0.5, size * 0.75);
   while (height < top - size * 0.9) {
-    addLayer(clumps, random, x, z, height, widthAt(radius, depth, height - base), size, (height - base) / depth);
+    addLayer(clumps, random, x, z, height, widthAt(crown.form, radius, depth, height - base), size, (height - base) / depth, crown.form.gaps);
     height += step * (0.85 + random() * 0.3);
   }
   clumps.push([x, top - size, z, size, 1]);
@@ -336,9 +427,10 @@ function ensureCapacity(state, key, needed) {
 // ---------------------------------------------------------------------------
 
 function setTreeSpecies(state, theRun) {
-  // each species' leaf colour (from its genus) and bark colour
+  // each species' leaf colour and crown form (from its genus) and bark colour
   state.foliage = [];
   state.bark = [];
+  state.crownFormsBySpecies = [];
   for (var s = 0; s < theRun.species.length; s++) {
     var species = theRun.species[s];
     var foliage = foliageFor(species ? species.name : "");
@@ -349,6 +441,7 @@ function setTreeSpecies(state, theRun) {
     colour.getHSL(hsl);
     colour.setHSL(hsl.h + (random() - 0.5) * 0.035, hsl.s * (0.9 + random() * 0.2), hsl.l * (0.92 + random() * 0.16));
     state.foliage.push({ colour: colour, needles: foliage.needles });
+    state.crownFormsBySpecies.push(crownFormFor(species ? species.name : "", foliage.needles));
     var bark = species && species.stemColour ? colourFromHsv(species.stemColour) : new THREE.Color("#5b4636");
     bark.lerp(new THREE.Color("#6b635a"), 0.85);
     state.bark.push(bark);
@@ -382,8 +475,9 @@ function placeTrees(state, theRun, cycle, options, clumpTotal) {
     var h0 = Math.max(p0[index.stemHeight], 0.001);
     var r0 = Math.max(p0[index.canopyRadius], 0.01);
     var top0 = (p0[index.elevation] || 0) + h0;
-    var depth0 = Math.max(crownDepth(theRun.species[p0[index.species]], h0, r0), 0.01);
-    var list = crownClumps(p0[index.x], top0, -p0[index.y], r0, depth0, clumpBudget);
+    var crown = crownFor(state, p0[index.species], theRun.species[p0[index.species]], h0, r0);
+    crown.depth = Math.max(crown.depth, 0.01);
+    var list = crownClumps(p0[index.x], top0, -p0[index.y], r0, crown, clumpBudget);
     crowns.push(list);
     total += list.length;
   }

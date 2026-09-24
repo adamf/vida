@@ -222,6 +222,7 @@ function attachSceneControls(state) {
   var quality = document.getElementById("quality-select");
   var motion = document.getElementById("motion-check");
   var tour = document.getElementById("tour-button");
+  var crowns = document.getElementById("crown-select");
   function applySun() {
     var hours = Number(slider.value);
     label.textContent = overhead.checked ? "overhead" : hoursLabel(hours);
@@ -239,6 +240,16 @@ function attachSceneControls(state) {
   }
   function onQuality() {
     setSceneQuality(state, quality.value);
+  }
+  if (crowns) {
+    crowns.value = state.crownForms;
+    crowns.addEventListener("change", onCrowns);
+  }
+  function onCrowns() {
+    state.crownForms = crowns.value;
+    if (state.lastCycle) {
+      sceneShowCycle(state.lastRun, state.lastCycle, state.lastOptions);
+    }
   }
   if (motion) {
     motion.addEventListener("change", onMotion);
@@ -324,6 +335,8 @@ function sceneStart(box) {
     header: null,
     world: 100,
     tallest: 20,
+    crownForms: "genus",
+    crownFormsBySpecies: [],
     dusk: 0,
     moving: true,
     touring: false,
