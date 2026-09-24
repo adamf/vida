@@ -21,6 +21,13 @@ import yaml #pip install PyYAML #https://pypi.org/project/PyYAML/
 import progressBarClass
 import spatial_grid
 
+###The experimental fast photon loop, written in Rust (see rust/README.md).
+###It gives exactly the same answers as countPhotonsGettingThrough.
+try:
+    import vida_fast
+except ImportError:
+    vida_fast=None
+
 ###experimental terrain import
 ###STH & EKT 05 Feb 2020
 import vterrainImport as terrain_utils
@@ -190,6 +197,9 @@ def determineShade(theGarden):
         print("***Determining shading. This could take a while...***")
         theProgressBar= progressBarClass.progressbarClass(len(theGarden.soil),"*")
         i=0
+    fastPhotons=None
+    if vida_fast is not None:
+        fastPhotons=vida_fast.Photons(random.getstate())
     for plant in theGarden.soil:
         if plant.isSeed==0 or (plant.isSeed and plant.minimumLightForGermination>0.0):
             fractionExposed=1.0
@@ -224,7 +234,10 @@ def determineShade(theGarden):
                     covers=[]
                     for overPlant in plant.overlapList:
                         covers.append((overPlant.x, overPlant.y, overPlant.r, overPlant.canopyTransmittance))
-                    hitCount=countPhotonsGettingThrough(plant.x, plant.y, plant.r, numbPhotons, covers)
+                    if fastPhotons is not None:
+                        hitCount=fastPhotons.count(plant.x, plant.y, plant.r, numbPhotons, covers)
+                    else:
+                        hitCount=countPhotonsGettingThrough(plant.x, plant.y, plant.r, numbPhotons, covers)
                     if numbPhotons ==0:
                         fractionExposed=0.0
                     else:
@@ -245,6 +258,8 @@ def determineShade(theGarden):
         if theGarden.showProgressBar:
             i=i+1
             theProgressBar.update(i)
+    if fastPhotons is not None:
+        random.setstate(fastPhotons.state())
 
 
 

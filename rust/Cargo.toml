@@ -1,0 +1,18 @@
+[package]
+name = "vida_fast"
+version = "0.1.0"
+edition = "2021"
+description = "Optional fast parts of Vida, giving exactly the same results as the Python code"
+license-file = "../LICENSE.txt"
+publish = false
+
+[lib]
+name = "vida_fast"
+crate-type = ["cdylib"]
+
+[dependencies]
+# abi3: one build works with every Python from 3.8 on
+pyo3 = { version = "0.29", features = ["extension-module", "abi3-py38"] }
+
+[profile.release]
+opt-level = 3
