@@ -230,12 +230,150 @@ function drawLeaf(context, x, y, length, width, angle, shade, tint) {
   context.restore();
 }
 
-function leafTexture() {
-  // A spray of leaves on twigs, in greys (with a little warmth and coolness
-  // here and there): the tree's own colour is multiplied in.
+// Leaf outlines, drawn with the tip up (towards -y) and the stalk down, as
+// [angle in degrees, length] for each lobe of a leaf that spreads from its
+// stalk like fingers from a palm (0 is straight up), and how deep the gaps
+// between the lobes go.
+var PALM_LEAVES = {
+  // red maple: three main lobes and two small ones at the bottom, toothed
+  maple: { lobes: [[-118, 0.5], [-52, 0.86], [0, 1], [52, 0.86], [118, 0.5]], gap: 0.4, teeth: true },
+  // sweetgum: a star of five long, pointed lobes
+  sweetgum: { lobes: [[-128, 0.78], [-64, 0.95], [0, 1], [64, 0.95], [128, 0.78]], gap: 0.3, teeth: false }
+};
+
+function leafFill(context, length, shade, tint) {
+  // lighter towards the tip, darker towards the stalk
+  var gradient = context.createLinearGradient(0, length / 2, 0, -length / 2);
+  gradient.addColorStop(0, "rgb(" + Math.round(shade * 0.72 * tint[0]) + "," + Math.round(shade * 0.72 * tint[1]) + "," + Math.round(shade * 0.72 * tint[2]) + ")");
+  gradient.addColorStop(1, "rgb(" + Math.round(Math.min(255, shade * 1.08 * tint[0])) + "," + Math.round(Math.min(255, shade * 1.08 * tint[1])) + "," + Math.round(Math.min(255, shade * 1.08 * tint[2])) + ")");
+  return gradient;
+}
+
+function drawPalmLeaf(context, shape, x, y, size, angle, shade, tint) {
+  // a maple or sweetgum leaf, `size` from its middle to the tip of the top lobe
+  context.save();
+  context.translate(x, y);
+  context.rotate(angle);
+  context.fillStyle = leafFill(context, size * 2, shade, tint);
+  context.beginPath();
+  context.moveTo(0, size * 0.12);
+  var lobes = shape.lobes;
+  for (var i = 0; i < lobes.length; i++) {
+    var direction = (lobes[i][0] - 90) * Math.PI / 180;
+    var reach = lobes[i][1] * size;
+    var before = i === 0 ? (lobes[i][0] - 90 - 40) * Math.PI / 180 : (lobes[i][0] + lobes[i - 1][0] - 180) / 2 * Math.PI / 180;
+    // the gap before this lobe, then up one side of the lobe to its tip
+    context.lineTo(Math.cos(before) * shape.gap * size, Math.sin(before) * shape.gap * size);
+    var side = 0.2;
+    if (shape.teeth) {
+      context.lineTo(Math.cos(direction - side) * reach * 0.62, Math.sin(direction - side) * reach * 0.62);
+      context.lineTo(Math.cos(direction - side * 1.2) * reach * 0.8, Math.sin(direction - side * 1.2) * reach * 0.8);
+    }
+    context.lineTo(Math.cos(direction - 0.05) * reach * 0.86, Math.sin(direction - 0.05) * reach * 0.86);
+    context.lineTo(Math.cos(direction) * reach, Math.sin(direction) * reach);
+    context.lineTo(Math.cos(direction + 0.05) * reach * 0.86, Math.sin(direction + 0.05) * reach * 0.86);
+    if (shape.teeth) {
+      context.lineTo(Math.cos(direction + side * 1.2) * reach * 0.8, Math.sin(direction + side * 1.2) * reach * 0.8);
+      context.lineTo(Math.cos(direction + side) * reach * 0.62, Math.sin(direction + side) * reach * 0.62);
+    }
+  }
+  var after = (lobes[lobes.length - 1][0] - 90 + 40) * Math.PI / 180;
+  context.lineTo(Math.cos(after) * shape.gap * size, Math.sin(after) * shape.gap * size);
+  context.closePath();
+  context.fill();
+  // veins from the stalk to each lobe
+  context.strokeStyle = "rgba(255,255,240,0.28)";
+  context.lineWidth = 1.2;
+  for (var v = 0; v < lobes.length; v++) {
+    var veinDirection = (lobes[v][0] - 90) * Math.PI / 180;
+    context.beginPath();
+    context.moveTo(0, size * 0.1);
+    context.lineTo(Math.cos(veinDirection) * lobes[v][1] * size * 0.9, Math.sin(veinDirection) * lobes[v][1] * size * 0.9);
+    context.stroke();
+  }
+  context.strokeStyle = "rgba(70,60,50,0.8)";
+  context.lineWidth = 1.6;
+  context.beginPath();
+  context.moveTo(0, size * 0.1);
+  context.lineTo(0, size * 0.55);
+  context.stroke();
+  context.restore();
+}
+
+function drawOakLeaf(context, x, y, length, width, angle, shade, tint) {
+  // an oak leaf: longer than wide, with rounded lobes down each side
+  context.save();
+  context.translate(x, y);
+  context.rotate(angle);
+  context.fillStyle = leafFill(context, length, shade, tint);
+  var steps = 40;
+  var lobes = 3.5;
+  var points = [];
+  for (var i = 0; i <= steps; i++) {
+    var along = i / steps;
+    // tapering at both ends, widest a little above the middle
+    var outline = Math.sin(Math.PI * Math.pow(along, 0.85));
+    var bulge = 0.5 + 0.5 * Math.pow(Math.abs(Math.sin(along * Math.PI * lobes)), 0.55);
+    points.push([width * outline * bulge, length / 2 - along * length]);
+  }
+  context.beginPath();
+  context.moveTo(0, length / 2);
+  for (var right = 0; right < points.length; right++) {
+    context.lineTo(points[right][0], points[right][1]);
+  }
+  for (var left = points.length - 1; left >= 0; left--) {
+    context.lineTo(-points[left][0], points[left][1]);
+  }
+  context.fill();
+  context.strokeStyle = "rgba(255,255,240,0.3)";
+  context.lineWidth = 1.3;
+  context.beginPath();
+  context.moveTo(0, length / 2 + 6);
+  context.lineTo(0, -length / 2 + 4);
+  context.stroke();
+  context.restore();
+}
+
+function drawCompoundLeaf(context, x, y, length, angle, shade, tint) {
+  // a hickory leaf: a stalk with two pairs of leaflets and one at the end
+  context.save();
+  context.translate(x, y);
+  context.rotate(angle);
+  context.strokeStyle = "rgba(90,80,60,0.9)";
+  context.lineWidth = 1.8;
+  context.beginPath();
+  context.moveTo(0, length / 2);
+  context.lineTo(0, -length / 2 + length * 0.2);
+  context.stroke();
+  var pairs = [[0.25, 0.3], [0.55, 0.36]];
+  for (var p = 0; p < pairs.length; p++) {
+    var at = length / 2 - pairs[p][0] * length;
+    var leaflet = pairs[p][1] * length;
+    drawLeaf(context, Math.cos(-0.7) * leaflet * 0.5, at + Math.sin(-0.7) * leaflet * 0.5, leaflet, leaflet * 0.36, 0.87, shade * 0.95, tint);
+    drawLeaf(context, -Math.cos(-0.7) * leaflet * 0.5, at + Math.sin(-0.7) * leaflet * 0.5, leaflet, leaflet * 0.36, -0.87, shade * 0.95, tint);
+  }
+  drawLeaf(context, 0, -length / 2 + length * 0.12, length * 0.4, length * 0.15, 0, shade, tint);
+  context.restore();
+}
+
+function leafTint(random) {
+  // a little warmth or coolness now and then
+  var pick = random();
+  if (pick < 0.12) {
+    return [1.08, 1.04, 0.86];
+  }
+  if (pick < 0.22) {
+    return [0.92, 1.0, 1.06];
+  }
+  return [1, 1, 1];
+}
+
+function leafSprayTexture(kind, seed) {
+  // A spray of leaves of one kind on twigs, in greys (the tree's own colour
+  // is multiplied in): "oval", "oak", "maple", "sweetgum" or "hickory".
   var canvas = newCanvas(512, 512);
   var context = canvas.getContext("2d");
-  var random = makeRandom(7);
+  var random = makeRandom(seed);
   context.strokeStyle = "rgba(70,60,50,0.9)";
   context.lineWidth = 3;
   for (var t = 0; t < 5; t++) {
@@ -245,26 +383,77 @@ function leafTexture() {
     context.lineTo(256 + Math.cos(angle) * 190, 256 + Math.sin(angle) * 190);
     context.stroke();
   }
-  for (var i = 0; i < 46; i++) {
+  var counts = { oval: 46, oak: 34, maple: 42, sweetgum: 42, hickory: 16, magnolia: 26 };
+  var count = counts[kind] || 46;
+  for (var i = 0; i < count; i++) {
     var leafAngle = random() * Math.PI * 2;
-    var distance = Math.sqrt(random()) * 185;
+    var distance = Math.sqrt(random()) * 180;
     var x = 256 + Math.cos(leafAngle) * distance;
     var y = 256 + Math.sin(leafAngle) * distance;
     var shade = 165 + Math.floor(random() * 90);
-    var tint = [1, 1, 1];
-    var pick = random();
-    if (pick < 0.12) {
-      tint = [1.08, 1.04, 0.86];
-    } else if (pick < 0.22) {
-      tint = [0.92, 1.0, 1.06];
+    var tint = leafTint(random);
+    var turn = leafAngle + Math.PI / 2 + (random() - 0.5) * 1.2;
+    if (kind === "maple" || kind === "sweetgum") {
+      drawPalmLeaf(context, PALM_LEAVES[kind], x, y, 44 + random() * 16, turn, shade, tint);
+    } else if (kind === "oak") {
+      drawOakLeaf(context, x, y, 92 + random() * 30, 30 + random() * 8, turn, shade, tint);
+    } else if (kind === "hickory") {
+      drawCompoundLeaf(context, x, y, 150 + random() * 40, turn, shade, tint);
+    } else if (kind === "magnolia") {
+      drawLeaf(context, x, y, 104 + random() * 30, 34 + random() * 10, turn, shade, tint);
+    } else {
+      drawLeaf(context, x, y, 70 + random() * 38, 26 + random() * 12, turn, shade, tint);
     }
-    drawLeaf(context, x, y, 70 + random() * 38, 26 + random() * 12, leafAngle + Math.PI / 2 + (random() - 0.5) * 1.2, shade, tint);
   }
   return colourTexture(canvas, false);
 }
 
-function needleTexture() {
-  // Sprays of pine needles along little twigs, in greys.
+function pineNeedleTexture() {
+  // Pine needles: long, and in tufts (brushes) at the ends of the twigs.
+  var canvas = newCanvas(512, 512);
+  var context = canvas.getContext("2d");
+  var random = makeRandom(13);
+  context.lineCap = "round";
+  var tufts = 9;
+  for (var tuft = 0; tuft < tufts; tuft++) {
+    // spread round the card, so each tuft shows
+    var angle = (tuft + random() * 0.6) / tufts * Math.PI * 2;
+    var startDistance = random() * 30;
+    var sx = 256 + Math.cos(angle) * startDistance;
+    var sy = 256 + Math.sin(angle) * startDistance;
+    var twig = 50 + random() * 60;
+    var ex = sx + Math.cos(angle) * twig;
+    var ey = sy + Math.sin(angle) * twig;
+    context.strokeStyle = "rgb(105,88,70)";
+    context.lineWidth = 4;
+    context.beginPath();
+    context.moveTo(sx, sy);
+    context.lineTo(ex, ey);
+    context.stroke();
+    // the needles spring from the last part of the twig and fan out forwards
+    for (var n = 0; n < 44; n++) {
+      var from = 0.55 + random() * 0.45;
+      var px = sx + (ex - sx) * from;
+      var py = sy + (ey - sy) * from;
+      var needleAngle = angle + (random() - 0.5) * 2.1;
+      var needleLength = 85 + random() * 60;
+      var bend = (random() - 0.5) * 24;
+      var shade = 150 + Math.floor(random() * 105);
+      context.strokeStyle = "rgb(" + shade + "," + shade + "," + Math.round(shade * 0.96) + ")";
+      context.lineWidth = 2.2;
+      context.beginPath();
+      context.moveTo(px, py);
+      var tx = px + Math.cos(needleAngle) * needleLength;
+      var ty = py + Math.sin(needleAngle) * needleLength;
+      context.quadraticCurveTo((px + tx) / 2 - Math.sin(needleAngle) * bend, (py + ty) / 2 + Math.cos(needleAngle) * bend, tx, ty);
+      context.stroke();
+    }
+  }
+  return colourTexture(canvas, false);
+}
+
+function firNeedleTexture() {
+  // Short needles in two rows along little twigs, like a spruce, fir or hemlock.
   var canvas = newCanvas(512, 512);
   var context = canvas.getContext("2d");
   var random = makeRandom(11);
@@ -300,6 +489,20 @@ function needleTexture() {
     }
   }
   return colourTexture(canvas, false);
+}
+
+function leafTextures() {
+  // one texture for each kind of leaf (see LEAF_KINDS in trees.js)
+  return {
+    pine: pineNeedleTexture(),
+    fir: firNeedleTexture(),
+    oval: leafSprayTexture("oval", 7),
+    magnolia: leafSprayTexture("magnolia", 8),
+    oak: leafSprayTexture("oak", 9),
+    maple: leafSprayTexture("maple", 10),
+    sweetgum: leafSprayTexture("sweetgum", 12),
+    hickory: leafSprayTexture("hickory", 14)
+  };
 }
 
 // ---------------------------------------------------------------------------

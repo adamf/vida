@@ -81,8 +81,12 @@ Everything else is decoration, to make it look like a real place:
   radius: pines grow a long bare trunk with the crown near the top, oaks a
   broad rounded crown, dogwoods a low flat-topped one, sweetgums and
   blackgums pointed ones, and so on (`CROWN_FORMS` in `scene/trees.js`).
-  Young trees of every kind have fuller, more pointed crowns. Leaf colour
-  also comes from the genus, and pines have needles;
+  Young trees of every kind have fuller, more pointed crowns;
+- leaves by genus too: pines have long needles in tufts, spruces, firs and
+  other conifers short needles, and the broadleaved trees their own leaves:
+  lobed oak leaves, maple leaves, star-shaped sweetgum leaves, hickory's
+  leaflets, big glossy magnolia leaves and plain oval leaves for the rest
+  (`FOLIAGE` in `scene/trees.js`), each in its genus's summer green;
 - a physically based sky (the Preetham model, from three.js's
   `examples/jsm/objects/Sky.js`) with drifting clouds, and a sun you can put
   at any time of day with the **Sun** slider. **overhead, as Vida's light

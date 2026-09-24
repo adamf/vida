@@ -375,8 +375,7 @@ function sceneStart(box) {
   state.scene.add(state.sky);
 
   var textures = {
-    leaves: leafTexture(),
-    needles: needleTexture(),
+    leaves: leafTextures(),
     bark: barkTextures(),
     ground: groundDetail(),
     ripples: waterNormals()

@@ -22,31 +22,51 @@
 
 "use strict";
 
-// Leaf colours by genus (the first word of the species name), in summer.
-// Needles are drawn for conifers. Anything not listed is a broadleaf tree.
+// Leaves by genus (the first word of the species name): their colour in
+// summer, and which kind of leaf (see LEAF_KINDS). Pines have long needles
+// in tufts; spruces, firs and the like short needles; the broadleaved trees
+// their own leaf shapes. Anything not listed is a broadleaved tree.
 var FOLIAGE = {
-  Pinus: { colour: "#4e6b2e", needles: true },
-  Picea: { colour: "#2f5238", needles: true },
-  Abies: { colour: "#2c5236", needles: true },
-  Tsuga: { colour: "#355a36", needles: true },
-  Juniperus: { colour: "#4d6344", needles: true },
-  Taxodium: { colour: "#5b7a34", needles: true },
-  Gymnosperm: { colour: "#3f6035", needles: true },
-  Acer: { colour: "#4f7f2f", needles: false },
-  Quercus: { colour: "#46672a", needles: false },
-  Carya: { colour: "#5d7f2d", needles: false },
-  Cornus: { colour: "#5b8537", needles: false },
-  Liquidambar: { colour: "#4d7c2b", needles: false },
-  Liriodendron: { colour: "#5a8a31", needles: false },
-  Magnolia: { colour: "#3c5f2c", needles: false },
-  Nyssa: { colour: "#46702d", needles: false },
-  Prunus: { colour: "#4b6f2a", needles: false },
-  Fagus: { colour: "#5a7f33", needles: false },
-  Betula: { colour: "#6a8c35", needles: false },
-  Castanea: { colour: "#4f732c", needles: false },
-  Angiosperm: { colour: "#52792f", needles: false }
+  Pinus: { colour: "#4e6b2e", leaf: "pine" },
+  Picea: { colour: "#2f5238", leaf: "fir" },
+  Abies: { colour: "#2c5236", leaf: "fir" },
+  Tsuga: { colour: "#355a36", leaf: "fir" },
+  Juniperus: { colour: "#4d6344", leaf: "fir" },
+  Taxodium: { colour: "#5b7a34", leaf: "fir" },
+  Gymnosperm: { colour: "#3f6035", leaf: "fir" },
+  Acer: { colour: "#4f7f2f", leaf: "maple" },
+  Quercus: { colour: "#46672a", leaf: "oak" },
+  Carya: { colour: "#5d7f2d", leaf: "hickory" },
+  Cornus: { colour: "#5b8537", leaf: "oval" },
+  Liquidambar: { colour: "#4d7c2b", leaf: "sweetgum" },
+  Liriodendron: { colour: "#5a8a31", leaf: "maple" },
+  Magnolia: { colour: "#3c5f2c", leaf: "magnolia" },
+  Nyssa: { colour: "#46702d", leaf: "oval" },
+  Prunus: { colour: "#4b6f2a", leaf: "oval" },
+  Fagus: { colour: "#5a7f33", leaf: "oval" },
+  Betula: { colour: "#6a8c35", leaf: "oval" },
+  Castanea: { colour: "#4f732c", leaf: "oval" },
+  Angiosperm: { colour: "#52792f", leaf: "oval" }
 };
-var DEFAULT_FOLIAGE = { colour: "#52792f", needles: false };
+var DEFAULT_FOLIAGE = { colour: "#52792f", leaf: "oval" };
+
+// The kinds of leaf, each drawn as its own set of clumps: [kind, how many
+// cards of leaves a clump has, how big each card is]. The pictures on the
+// cards are in textures.js.
+var LEAF_KINDS = [
+  ["pine", 46, 0.9],
+  ["fir", 46, 0.82],
+  ["oval", 44, 0.8],
+  ["magnolia", 42, 0.85],
+  ["oak", 44, 0.82],
+  ["maple", 44, 0.82],
+  ["sweetgum", 44, 0.82],
+  ["hickory", 42, 0.9]
+];
+
+function hasNeedles(leaf) {
+  return leaf === "pine" || leaf === "fir";
+}
 
 function foliageFor(speciesName) {
   var words = String(speciesName || "").split(/[_\s]+/);
@@ -370,19 +390,21 @@ function makeTreeMeshes(state, textures) {
     normalScale: new THREE.Vector2(2.2, 2.2), roughness: 0.95, metalness: 0, envMapIntensity: 0.45 });
   makeInstanced(state, "stems", stemGeometry, state.materials.stem, true);
 
+  // for each kind of leaf, the cards of leaves, and a dark core inside each
+  // clump so there are no holes to see through
   var core = clumpCoreGeometry();
-  var styles = [["broad", textures.leaves, 44, 0.8], ["needle", textures.needles, 46, 0.82]];
-  for (var i = 0; i < styles.length; i++) {
-    var key = styles[i][0];
-    var texture = styles[i][1];
+  var coreMaterial = addWind(state, new THREE.MeshStandardMaterial({ roughness: 1.0, metalness: 0, envMapIntensity: 0.25 }), false);
+  var coreDepth = addWind(state, new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), false);
+  for (var i = 0; i < LEAF_KINDS.length; i++) {
+    var key = LEAF_KINDS[i][0];
+    var texture = textures.leaves[key];
     var cardMaterial = addWind(state, new THREE.MeshStandardMaterial({ map: texture, alphaTest: 0.5, side: THREE.DoubleSide,
-      roughness: 0.88, metalness: 0, envMapIntensity: 0.32 }), true);
-    var coreMaterial = addWind(state, new THREE.MeshStandardMaterial({ roughness: 1.0, metalness: 0, envMapIntensity: 0.25 }), false);
-    var cards = makeInstanced(state, key + "Leaves", clumpLeavesGeometry(styles[i][2], styles[i][3], 101 + i), cardMaterial, true);
+      roughness: key === "magnolia" ? 0.6 : 0.88, metalness: 0, envMapIntensity: 0.32 }), true);
+    var cards = makeInstanced(state, key + "Leaves", clumpLeavesGeometry(LEAF_KINDS[i][1], LEAF_KINDS[i][2], 101 + i), cardMaterial, true);
     var depthMaterial = addWind(state, new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: texture, alphaTest: 0.5 }), false);
     cards.customDepthMaterial = depthMaterial;
     var coreMesh = makeInstanced(state, key + "Core", core, coreMaterial, true);
-    coreMesh.customDepthMaterial = addWind(state, new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), false);
+    coreMesh.customDepthMaterial = coreDepth;
   }
 }
 
@@ -440,8 +462,8 @@ function setTreeSpecies(state, theRun) {
     var hsl = {};
     colour.getHSL(hsl);
     colour.setHSL(hsl.h + (random() - 0.5) * 0.035, hsl.s * (0.9 + random() * 0.2), hsl.l * (0.92 + random() * 0.16));
-    state.foliage.push({ colour: colour, needles: foliage.needles });
-    state.crownFormsBySpecies.push(crownFormFor(species ? species.name : "", foliage.needles));
+    state.foliage.push({ colour: colour, leaf: foliage.leaf });
+    state.crownFormsBySpecies.push(crownFormFor(species ? species.name : "", hasNeedles(foliage.leaf)));
     var bark = species && species.stemColour ? colourFromHsv(species.stemColour) : new THREE.Color("#5b4636");
     bark.lerp(new THREE.Color("#6b635a"), 0.85);
     state.bark.push(bark);
@@ -464,12 +486,17 @@ function placeTrees(state, theRun, cycle, options, clumpTotal) {
   var turnAxis = new THREE.Vector3();
 
   var stems = ensureCapacity(state, "stems", plants.length);
-  var counts = { broadLeaves: 0, broadCore: 0, needleLeaves: 0, needleCore: 0 };
   // share the clumps out: a crown may have a little more than its share,
   // since most crowns need fewer
   var clumpBudget = Math.max(3, 1.3 * clumpTotal / Math.max(1, plants.length));
   var crowns = [];
-  var total = 0;
+  var needed = {};
+  var counts = {};
+  for (var kind = 0; kind < LEAF_KINDS.length; kind++) {
+    needed[LEAF_KINDS[kind][0]] = 0;
+    counts[LEAF_KINDS[kind][0] + "Leaves"] = 0;
+    counts[LEAF_KINDS[kind][0] + "Core"] = 0;
+  }
   for (var q = 0; q < plants.length; q++) {
     var p0 = plants[q];
     var h0 = Math.max(p0[index.stemHeight], 0.001);
@@ -479,14 +506,15 @@ function placeTrees(state, theRun, cycle, options, clumpTotal) {
     crown.depth = Math.max(crown.depth, 0.01);
     var list = crownClumps(p0[index.x], top0, -p0[index.y], r0, crown, clumpBudget);
     crowns.push(list);
-    total += list.length;
+    var leaf0 = (state.foliage[p0[index.species]] || DEFAULT_FOLIAGE).leaf;
+    needed[leaf0] += list.length;
   }
-  var meshes = {
-    broadLeaves: ensureCapacity(state, "broadLeaves", total + 1),
-    broadCore: ensureCapacity(state, "broadCore", total + 1),
-    needleLeaves: ensureCapacity(state, "needleLeaves", total + 1),
-    needleCore: ensureCapacity(state, "needleCore", total + 1)
-  };
+  var meshes = {};
+  for (var m = 0; m < LEAF_KINDS.length; m++) {
+    var leafKind = LEAF_KINDS[m][0];
+    meshes[leafKind + "Leaves"] = ensureCapacity(state, leafKind + "Leaves", needed[leafKind] + 1);
+    meshes[leafKind + "Core"] = ensureCapacity(state, leafKind + "Core", needed[leafKind] + 1);
+  }
 
   for (var p = 0; p < plants.length; p++) {
     var plant = plants[p];
@@ -515,7 +543,7 @@ function placeTrees(state, theRun, cycle, options, clumpTotal) {
     stems.setColorAt(p, colour);
 
     // the crown
-    var foliage = state.foliage[speciesNumber] || { colour: new THREE.Color(DEFAULT_FOLIAGE.colour), needles: false };
+    var foliage = state.foliage[speciesNumber] || { colour: new THREE.Color(DEFAULT_FOLIAGE.colour), leaf: DEFAULT_FOLIAGE.leaf };
     if (options.colourBy === "light" && options.lightColour) {
       colour.set(options.lightColour(light));
     } else {
@@ -526,7 +554,7 @@ function placeTrees(state, theRun, cycle, options, clumpTotal) {
     if (faded) {
       colour.lerp(dim, 0.75);
     }
-    var style = foliage.needles ? "needle" : "broad";
+    var style = foliage.leaf;
     var leavesMesh = meshes[style + "Leaves"];
     var coreMesh = meshes[style + "Core"];
     var clumps = crowns[p];
@@ -551,11 +579,10 @@ function placeTrees(state, theRun, cycle, options, clumpTotal) {
     }
   }
   stems.count = plants.length;
-  var keys = ["broadLeaves", "broadCore", "needleLeaves", "needleCore"];
-  for (var k = 0; k < keys.length; k++) {
-    meshes[keys[k]].count = counts[keys[k]];
-    meshes[keys[k]].instanceMatrix.needsUpdate = true;
-    meshes[keys[k]].instanceColor.needsUpdate = true;
+  for (var key in meshes) {
+    meshes[key].count = counts[key];
+    meshes[key].instanceMatrix.needsUpdate = true;
+    meshes[key].instanceColor.needsUpdate = true;
   }
   stems.instanceMatrix.needsUpdate = true;
   stems.instanceColor.needsUpdate = true;
