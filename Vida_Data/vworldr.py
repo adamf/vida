@@ -191,26 +191,32 @@ def determineShade(theGarden):
                     if numbPhotons>750: #we don't need monster numbers
                         numbPhotons=750
                     hitCount=0
+                    ###The canopies above, as (x, y, radius, transmittance), looked
+                    ###up once here rather than for every photon.
+                    covers=[]
+                    for overPlant in plant.overlapList:
+                        covers.append((overPlant.x, overPlant.y, overPlant.r, overPlant.canopyTransmittance))
+                    twoPi=math.pi*2
                     for photon in range(numbPhotons):
-                        #####consider moving this to geometry_utils
                         ###pick uniformly distributed point in a circle
-                        randr=(random.random()*(plant.r-0))+0 #random between 0 and the radius
-                        twoPi=math.pi*2
+                        randr=random.random()*plant.r #random between 0 and the radius
                         randAngle=random.random()*twoPi
                         #randr =math.sqrt(randr) #if you don't use sqrt, you get clustering in the center
                         randr =randr**0.5 #if you don't use sqrt, you get clustering in the center
                         photonX = (randr*math.cos(randAngle))+plant.x
                         photonY = (randr*math.sin(randAngle))+plant.y
-                        ######
-                        for overPlant in plant.overlapList:
-                            if not photonX=="gone":
-                                if geometry_utils.pointInsideCircle(overPlant.x, overPlant.y, overPlant.r, photonX, photonY):
-                                    randomValue=random.random()
-                                    if randomValue > overPlant.canopyTransmittance:
-                                        ###these points are where the overlap is
-                                        photonX="gone"
-                                    break
-                        if not photonX=="gone":
+                        ###The photon stops at the first canopy it lands in (in the
+                        ###order of the overlap list), unless it gets through that
+                        ###canopy. Either way it isn't checked against the rest.
+                        ###(The distance is worked out as in
+                        ###geometry_utils.pointInsideCircle.)
+                        blocked=False
+                        for coverX, coverY, coverR, coverTransmittance in covers:
+                            if math.hypot(coverX-photonX, coverY-photonY)<=coverR:
+                                if random.random() > coverTransmittance:
+                                    blocked=True
+                                break
+                        if not blocked:
                             hitCount=hitCount+1
                     if numbPhotons ==0:
                         fractionExposed=0.0
