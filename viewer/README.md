@@ -84,14 +84,16 @@ Everything else is decoration, to make it look like a real place:
 - hundreds of thousands of blades of grass, swaying in rolling gusts of wind
   and glowing when the sun is behind them (after well-known open-source
   grass such as al-ro's instanced grass and James Smyth's Breath of the Wild
-  style grass);
+  style grass), with a scattering of wildflowers;
 - water that reflects the world (the reflection maths is from three.js's
-  `examples/jsm/objects/Reflector.js`), is clear in the shallows and dark
-  where deep, glints in the sun and has foam along the shore, with light
-  patterns (caustics) on the bottom;
+  `examples/jsm/objects/Reflector.js`), more so the lower you look across it,
+  shows the bottom in the shallows and is dark where deep, glints in the sun
+  and has foam along the shore, with a net of light (caustics) on the bottom;
 - leaves that sway and glow when the sun shines through them, bark, soil,
-  rock and wet mud, low hills all round, dust in the air, birds overhead and
-  fireflies at dusk;
+  layered rock and wet mud, dust in the air, birds overhead and fireflies at
+  dusk;
+- all round, well away from the simulated world: low hills with woods on
+  them, and blue mountains on the skyline;
 - bloom, light shafts through the trees, the ACES filmic curve and a gentle
   colour grade.
 

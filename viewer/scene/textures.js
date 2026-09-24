@@ -8,8 +8,10 @@
 
 // Noise for shaders: sceneHash (a random number for a point), sceneNoise
 // (smooth random hills), sceneFbm (several sizes of hills added together)
-// and sceneCells (distance to the nearest of a set of moving points, for
-// foam and the light patterns on the bottom of the water).
+// sceneCells (distance to the nearest of a set of moving points, for foam)
+// and sceneCellEdges (how far from the line halfway between the two nearest
+// points: small along a net of thin lines, like the light patterns that
+// ripples focus on the bottom of the water).
 var SCENE_NOISE_GLSL = [
   "float sceneHash(vec2 p) {",
   "  p = fract(p * vec2(123.34, 456.21));",
@@ -46,6 +48,23 @@ var SCENE_NOISE_GLSL = [
   "    }",
   "  }",
   "  return best;",
+  "}",
+  "float sceneCellEdges(vec2 p, float t) {",
+  "  vec2 i = floor(p);",
+  "  vec2 f = fract(p);",
+  "  float nearest = 8.0;",
+  "  float next = 8.0;",
+  "  for (int y = -1; y <= 1; y++) {",
+  "    for (int x = -1; x <= 1; x++) {",
+  "      vec2 cell = vec2(float(x), float(y));",
+  "      vec2 point = vec2(sceneHash(i + cell), sceneHash(i + cell + 31.7));",
+  "      point = 0.5 + 0.5 * sin(t + 6.2831 * point);",
+  "      float d = length(cell + point - f);",
+  "      next = min(next, max(nearest, d));",
+  "      nearest = min(nearest, d);",
+  "    }",
+  "  }",
+  "  return next - nearest;",
   "}"
 ].join("\n");
 

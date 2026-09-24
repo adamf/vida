@@ -370,10 +370,11 @@ function sceneStart(box) {
   };
   state.materials.ground = makeGroundMaterial(state, textures.ground);
   state.materials.grass = makeGrassMaterial(state);
-  // the far hills fade by their own colours, not the fog, so they stay a
-  // little darker than the sky behind them
+  // the far hills and mountains fade by their own colours, not the fog, so
+  // they stay a little darker than the sky behind them
   state.materials.farHills = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, envMapIntensity: 0.6, side: THREE.DoubleSide, fog: false });
-  state.materials.edge = new THREE.LineBasicMaterial({ color: new THREE.Color(1, 0.97, 0.85), transparent: true, opacity: 0.22 });
+  state.materials.farWoods = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, envMapIntensity: 0.6 });
+  state.materials.edge = new THREE.LineBasicMaterial({ color: new THREE.Color(1, 0.97, 0.85), transparent: true, opacity: 0.14 });
   makeTreeMeshes(state, textures);
   makeWater(state, textures);
   makeLife(state);
@@ -428,8 +429,8 @@ function sceneSetRun(theRun) {
   setTreeSpecies(state, theRun);
   // sky, fog and the sun's shadow box, sized to the world
   var world = state.world;
-  state.scene.fog.near = world * 1.2;
-  state.scene.fog.far = world * 7;
+  state.scene.fog.near = world * 1.5;
+  state.scene.fog.far = world * 10;
   state.sky.scale.setScalar(world * 8);
   var shadowSize = world * 0.72;
   var shadowCamera = state.sun.shadow.camera;

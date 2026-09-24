@@ -7,8 +7,9 @@
 //     is drawn a second time from a camera below the water (the reflection
 //     maths is from three.js's examples/jsm/objects/Reflector.js, MIT);
 //   - how much it reflects depends on the angle you look at it (Fresnel);
-//   - it is clear and green where shallow and dark where deep, using how
-//     far the ground is below the surface (from the height map);
+//   - the bottom shows through where it is shallow, and it is dark green
+//     where deep, using how far the ground is below the surface (from the
+//     height map);
 //   - ripples drift across it, the sun glints off them, and foam lines the
 //     shore.
 
@@ -48,6 +49,8 @@ var WATER_FRAGMENT = [
   "void main() {",
   "  vec3 place = vWaterPlace;",
   "  vec2 heightUv = place.xz / heightMapSize + 0.5;",
+  // no water beyond the land the height map covers
+  "  if (heightUv.x < 0.0 || heightUv.x > 1.0 || heightUv.y < 0.0 || heightUv.y > 1.0) discard;",
   "  float ground = texture2D(heightMap, heightUv).r;",
   "  float depth = waterLevel - ground;",
   "  if (depth <= 0.0) discard;",
@@ -55,38 +58,39 @@ var WATER_FRAGMENT = [
   "  vec2 drift = vec2(time * 0.035, time * 0.021) * (0.4 + windStrength);",
   "  vec3 ripple1 = texture2D(ripples, place.xz * 0.09 + drift).rgb * 2.0 - 1.0;",
   "  vec3 ripple2 = texture2D(ripples, place.xz * 0.21 - drift * 1.4 + 0.37).rgb * 2.0 - 1.0;",
-  "  vec2 tilt = (ripple1.xy + ripple2.xy * 0.6) * (0.12 + 0.1 * windStrength);",
+  "  vec2 tilt = (ripple1.xy + ripple2.xy * 0.6) * (0.08 + 0.08 * windStrength);",
   "  vec3 normal = normalize(vec3(tilt.x, 1.0, -tilt.y));",
   "  vec3 view = normalize(cameraPosition - place);",
   "  float facing = max(dot(normal, view), 0.0);",
-  "  float fresnel = 0.02 + 0.7 * pow(1.0 - facing, 5.0);",
+  // how much it reflects depends on the angle you look at it (Schlick's
+  // formula for Fresnel, for water)
+  "  float fresnel = 0.02 + 0.98 * pow(1.0 - facing, 5.0);",
   // what it reflects
-  "  vec3 reflected = skyColour;",
+  "  vec3 reflected = skyColour * 1.6;",
   "  if (useReflection > 0.5) {",
-  "    vec2 mirror = vReflectPlace.xy / vReflectPlace.w + tilt * 0.35;",
+  "    vec2 mirror = vReflectPlace.xy / vReflectPlace.w + tilt * 0.3;",
   "    reflected = texture2D(reflection, mirror).rgb;",
   "  }",
-  // water never reflects quite everything, and tints what it does
-  "  reflected *= vec3(0.78, 0.86, 0.9);",
-  "  if (false) {",
-  "  }",
-  // the water itself: clear green in the shallows, dark where deep
-  "  float murk = 1.0 - exp(-depth * 1.6);",
+  "  reflected *= vec3(0.88, 0.93, 0.95);",
+  // how much of the bottom shows through: less where it is deep, and less
+  // at a slant, where the light goes further through the water
+  "  float through = exp(-depth * 1.5 / max(facing, 0.25));",
   "  float daylight = clamp(sunDirection.y * 1.5 + 0.2, 0.08, 1.0);",
-  "  vec3 body = mix(vec3(0.06, 0.2, 0.17), vec3(0.006, 0.035, 0.05), murk) * daylight + sunColour * 0.02;",
-  "  float mirrorStrength = fresnel * mix(0.3, 1.0, smoothstep(0.02, 0.5, depth));",
-  "  vec3 colour = mix(body, reflected, mirrorStrength);",
+  "  vec3 body = vec3(0.02, 0.065, 0.055) * daylight + sunColour * 0.01;",
+  // light from the water itself (its colour), then what it reflects on top;
+  // the alpha lets the bottom show through by the same amount
+  "  float alpha = 1.0 - through * (1.0 - fresnel);",
+  "  vec3 colour = (body * (1.0 - through) * (1.0 - fresnel) + reflected * fresnel) / max(alpha, 0.001);",
   // the sun glinting off the ripples
   "  vec3 halfway = normalize(sunDirection + view);",
-  "  float glint = pow(max(dot(normal, halfway), 0.0), 700.0) * 9.0 + pow(max(dot(normal, halfway), 0.0), 60.0) * 0.12;",
-  "  colour += sunColour * glint;",
-  // foam along the shore
-  "  float shore = 1.0 - smoothstep(0.0, 0.07, depth);",
+  "  float glint = pow(max(dot(normal, halfway), 0.0), 900.0) * 12.0 + pow(max(dot(normal, halfway), 0.0), 250.0) * 0.06;",
+  "  colour += sunColour * glint / max(alpha, 0.05);",
+  // foam: a thin broken line along the shore
+  "  float shore = 1.0 - smoothstep(0.0, 0.06, depth);",
   "  float bubbles = 1.0 - sceneCells(place.xz * 3.2 + vec2(time * 0.12, time * 0.05), time * 0.9);",
   "  float foam = smoothstep(0.55, 0.9, bubbles * 0.7 + shore * 0.6) * shore;",
   "  colour = mix(colour, vec3(0.7) * (sunColour * 0.6 + vec3(0.25) * daylight), foam * 0.7);",
-  // see-through where shallow, so the bottom shows
-  "  float alpha = clamp(0.3 + murk * 0.8 + mirrorStrength * 0.6 + foam, 0.0, 1.0);",
+  "  alpha = clamp(max(alpha, foam * 0.7), 0.0, 1.0);",
   "  gl_FragColor = vec4(colour, alpha);",
   "  #include <fog_fragment>",
   "}"

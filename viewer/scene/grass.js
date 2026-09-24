@@ -9,7 +9,8 @@
 // The technique follows well-known open-source grass in three.js (al-ro's
 // instanced grass, James Smyth's Breath of the Wild style grass): a tapered
 // blade, a curve, wind as rolling gusts plus a flutter, a darker base and a
-// glow when the sun shines through from behind.
+// glow when the sun shines through from behind. A few of the blades are
+// wildflowers instead.
 
 "use strict";
 
@@ -65,7 +66,12 @@ var GRASS_BEGIN_VERTEX = [
   "float edge = max(abs(grassPlace.x), abs(grassPlace.z));",
   "tall *= 1.0 - smoothstep(grassReach * 0.55, grassReach, edge + seed * grassReach * 0.2);",
   "tall *= keep;",
+  // a few wildflowers: one stem in forty, in the sun, a little taller than
+  // the grass, with a head at the top
+  "float flower = step(0.975, fract(seed * 29.3)) * step(0.6, light);",
+  "tall *= 1.0 + flower * 0.25;",
   "float wide = grassShape.z * (1.0 - along * 0.85) * keep;",
+  "wide = mix(wide, grassShape.z * (along > 0.7 ? 1.0 : 0.3) * keep, flower);",
   "vec3 blade = vec3(position.x * wide, along * tall, 0.0);",
   // a natural curve, each blade its own
   "blade.z += along * along * tall * (0.15 + seed * 0.45);",
@@ -84,8 +90,12 @@ var GRASS_BEGIN_VERTEX = [
   // and in the sun, darker in the shade
   "float outside = max(abs(grassPlace.x), abs(grassPlace.z)) - worldSize * 0.5;",
   "vec3 tipColour = mix(vec3(0.2, 0.36, 0.05), vec3(0.34, 0.42, 0.1), fract(seed * 7.31));",
-  "tipColour = mix(tipColour, vec3(0.48, 0.4, 0.17), smoothstep(0.0, worldSize * 0.25, outside) * 0.7 + step(0.93, fract(seed * 13.7)) * 0.5);",
+  "tipColour = mix(tipColour, vec3(0.48, 0.4, 0.17), smoothstep(0.0, worldSize * 0.25, outside) * 0.35 + step(0.93, fract(seed * 13.7)) * 0.5);",
   "vGrassColour = mix(tipColour * vec3(0.35, 0.45, 0.3), tipColour, along) * mix(0.5, 1.0, smoothstep(0.0, 0.6, light));",
+  // flower heads: white, yellow or violet
+  "vec3 petals = mix(vec3(0.85, 0.82, 0.72), vec3(0.9, 0.62, 0.05), step(0.55, fract(seed * 5.1)));",
+  "petals = mix(petals, vec3(0.42, 0.22, 0.7), step(0.82, fract(seed * 3.7)));",
+  "vGrassColour = mix(vGrassColour, petals, flower * step(0.7, along));",
   // shining through the blade when the sun is behind it
   "vec3 towards = normalize(transformed - cameraPosition);",
   "vGrassGlow = pow(max(dot(towards, sunDirection), 0.0), 3.0) * along * light;"
@@ -145,13 +155,16 @@ function buildGrass(state, header, bladeCount) {
     var x = (random() * 2 - 1) * spread;
     var y = (random() * 2 - 1) * spread;
     var ground = state.groundHeight(x, y);
+    // none on steep slopes, where the ground is bare soil or rock
+    var rise = Math.abs(state.groundHeight(x + 0.4, y) - ground) + Math.abs(state.groundHeight(x, y + 0.4) - ground);
+    var steep = smoothStep(0.6, 1.0, rise / 0.4);
     places[i * 3] = x;
     places[i * 3 + 1] = ground - 0.02;
     places[i * 3 + 2] = -y;
     // meadow grass, taller in some patches
     var patch = 0.5 + 0.5 * Math.sin(x * 0.19 + Math.sin(y * 0.13) * 2.2) * Math.sin(y * 0.17 + Math.sin(x * 0.11) * 1.9);
     shapes[i * 4] = random() * Math.PI * 2;
-    shapes[i * 4 + 1] = (0.22 + random() * 0.3) * (0.7 + patch * 0.8);
+    shapes[i * 4 + 1] = (0.22 + random() * 0.3) * (0.7 + patch * 0.8) * (1 - steep);
     shapes[i * 4 + 2] = width * (0.7 + random() * 0.6);
     shapes[i * 4 + 3] = random();
   }

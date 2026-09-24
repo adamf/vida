@@ -129,6 +129,15 @@ var SKY_FRAGMENT = [
   "  L0 += (vSunE * 19000.0 * Fex) * sundisk;",
   "  vec3 texColor = (Lin + L0) * 0.04 + vec3(0.0, 0.0003, 0.00075);",
   "  vec3 colour = pow(texColor, vec3(1.0 / (1.2 + (1.2 * vSunfade))));",
+  // a little richer than the model gives, as on a clear, dry day
+  "  float skyLuma = dot(colour, vec3(0.2126, 0.7152, 0.0722));",
+  "  colour = max(mix(vec3(skyLuma), colour, 1.45), 0.0);",
+  // by day, the haze low in the sky is a pale blue away from the sun (the
+  // model makes it grey, and the tone mapping greyer)
+  "  float lowSky = 1.0 - smoothstep(-0.05, 0.4, direction.y);",
+  "  float awayFromSun = 1.0 - pow(max(cosTheta, 0.0), 3.0);",
+  "  float byDay = smoothstep(0.05, 0.35, vSunDirection.y);",
+  "  colour *= mix(vec3(1.0), vec3(0.92, 1.08, 1.38), lowSky * awayFromSun * byDay);",
   // clouds: soft patches on a flat layer above, drifting, lit from the sun's side
   "  if (direction.y > 0.0 && cloudCover > 0.0) {",
   "    vec2 cloudPlace = direction.xz / (direction.y + 0.08) * 1.6 + vec2(time * 0.012, time * 0.004);",
