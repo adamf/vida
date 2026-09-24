@@ -142,7 +142,7 @@ function makeGroundMaterial(state, textures) {
         "  colour = mix(colour, colour * 0.42, groundWetness * 0.85);",
         "  if (above < 0.0) {",
         "    float depth = -above;",
-        "    colour = mix(vec3(0.1, 0.095, 0.05), vec3(0.03, 0.045, 0.03), smoothstep(0.0, 1.2, depth)) * (0.75 + 0.5 * grain);",
+        "    colour = mix(vec3(0.065, 0.06, 0.032), vec3(0.02, 0.032, 0.02), smoothstep(0.0, 1.0, depth)) * (0.75 + 0.5 * grain);",
         // the net of light that the ripples focus on the bottom (caustics)
         "    float c1 = sceneCellEdges(place.xz * 1.1, time * 1.1);",
         "    float c2 = sceneCellEdges(place.xz * 1.7 + 7.0, time * 1.4);",
@@ -395,6 +395,27 @@ function ringMesh(radii, heights, colours, segments, material) {
   return new THREE.Mesh(geometry, material);
 }
 
+function makeFarWoodsMaterial() {
+  // The far woods' trees are plain shapes; darker low down, where they
+  // shade each other, and dappled, so from far off they look like a
+  // canopy of leaves rather than smooth balls and cones.
+  var material = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, envMapIntensity: 0.6 });
+  function onBeforeCompile(shader) {
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec3 vWoodPlace;\nvarying float vWoodHeight;")
+      .replace("#include <project_vertex>", "#include <project_vertex>\nvWoodHeight = position.y;\nvWoodPlace = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", "#include <common>\nvarying vec3 vWoodPlace;\nvarying float vWoodHeight;\n" + SCENE_NOISE_GLSL)
+      .replace("#include <color_fragment>", [
+        "#include <color_fragment>",
+        "float dapple = sceneNoise(vWoodPlace.xz * 0.9 + vWoodPlace.y * 1.3) * 0.6 + sceneNoise(vWoodPlace.zy * 2.1 + vWoodPlace.x * 0.7) * 0.4;",
+        "diffuseColor.rgb *= (0.45 + 0.9 * dapple) * mix(0.35, 1.0, smoothstep(0.05, 0.9, vWoodHeight));"
+      ].join("\n"));
+  }
+  material.onBeforeCompile = onBeforeCompile;
+  return material;
+}
+
 function joinGeometries(parts) {
   // One geometry from several (their points and normals, without indices).
   var positions = [];
@@ -441,9 +462,9 @@ function farCrownGeometry() {
 function buildFarLand(state, world, size, baseHeight) {
   // Decoration beyond the ground, all round: low hills with woods on them,
   // and a line of mountains further off. None of it is simulated. The hills
-  // and mountains fade into the haze by their own colours (not the fog), so
-  // they stay a little darker than the sky behind them; the woods fade in
-  // the fog, like the rest of the land.
+  // and woods fade in the fog, like the rest of the land; the mountains
+  // fade into the haze by their own colours (not the fog), so they stay a
+  // little darker than the sky behind them.
   var old = [state.farHills, state.farWoods, state.farMountains];
   function disposeGeometry(part) {
     if (part.geometry) {
@@ -456,7 +477,7 @@ function buildFarLand(state, world, size, baseHeight) {
       old[o].traverse(disposeGeometry);
     }
   }
-  var near = new THREE.Color(0.1, 0.16, 0.06);
+  var near = new THREE.Color(0.1, 0.18, 0.045);
   var far = new THREE.Color(0.15, 0.21, 0.28);
   // the hills start under the edge of the ground, so there is no gap
   var inner = size * 0.46;
@@ -467,8 +488,9 @@ function buildFarLand(state, world, size, baseHeight) {
   var radii = [];
   var colours = [];
   for (var ringNumber = 0; ringNumber <= rings; ringNumber++) {
-    radii.push(inner + ringNumber / rings * reach);
-    colours.push(near.clone().lerp(far, ringNumber / rings));
+    var out = ringNumber / rings;
+    radii.push(inner + out * reach);
+    colours.push(near.clone().lerp(far, Math.max(0, out - 0.25) / 0.75 * 0.7));
   }
   function hillHeight(ring, angle) {
     return baseHeight - 1 + farHillRise(world, angle, ring / rings);
@@ -549,6 +571,6 @@ function buildFarLand(state, world, size, baseHeight) {
     }
     return baseHeight + world * (0.2 + 0.8 * peaks / 2.4);
   }
-  state.farMountains = ringMesh(mountainRadii, mountainHeight, [foot, ridge], 360, state.materials.farHills);
+  state.farMountains = ringMesh(mountainRadii, mountainHeight, [foot, ridge], 360, state.materials.farMountains);
   state.scene.add(state.farMountains);
 }

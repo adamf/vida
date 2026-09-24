@@ -74,7 +74,7 @@ var WATER_FRAGMENT = [
   "  reflected *= vec3(0.88, 0.93, 0.95);",
   // how much of the bottom shows through: less where it is deep, and less
   // at a slant, where the light goes further through the water
-  "  float through = exp(-depth * 1.5 / max(facing, 0.25));",
+  "  float through = exp(-depth * 2.4 / max(facing, 0.25));",
   "  float daylight = clamp(sunDirection.y * 1.5 + 0.2, 0.08, 1.0);",
   "  vec3 body = vec3(0.02, 0.065, 0.055) * daylight + sunColour * 0.01;",
   // light from the water itself (its colour), then what it reflects on top;

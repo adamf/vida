@@ -370,10 +370,12 @@ function sceneStart(box) {
   };
   state.materials.ground = makeGroundMaterial(state, textures.ground);
   state.materials.grass = makeGrassMaterial(state);
-  // the far hills and mountains fade by their own colours, not the fog, so
-  // they stay a little darker than the sky behind them
-  state.materials.farHills = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, envMapIntensity: 0.6, side: THREE.DoubleSide, fog: false });
-  state.materials.farWoods = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, envMapIntensity: 0.6 });
+  // the far hills sit just behind the ground where they meet it (so the
+  // ground wins, with no flicker); the mountains fade by their own colours,
+  // not the fog, so they stay a little darker than the sky behind them
+  state.materials.farHills = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, envMapIntensity: 0.6, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 8 });
+  state.materials.farMountains = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, envMapIntensity: 0.6, side: THREE.DoubleSide, fog: false });
+  state.materials.farWoods = makeFarWoodsMaterial();
   state.materials.edge = new THREE.LineBasicMaterial({ color: new THREE.Color(1, 0.97, 0.85), transparent: true, opacity: 0.14 });
   makeTreeMeshes(state, textures);
   makeWater(state, textures);
