@@ -69,22 +69,45 @@ What comes from the simulation is drawn to scale:
 - the ground, from the terrain file, and the water level;
 - how much light each plant got: leaves are darker where it got less, as in
   Vida's own pictures. **Colour by light received** colours them by it
-  instead, and **Highlight** greys out the other species.
+  instead, and **Highlight** greys out the other species;
+- the shade of the canopies on the ground, worked out straight down as Vida
+  does: the ground is darker and the grass thinner and shorter under the
+  trees.
 
-The rest is decoration, to make it look like a real place: the leaves,
-needles, bark and grass, the leaf colour of each genus (pines, oaks,
-maples...), the hills outside the simulated square, and the angle of the
-sun. Vida's own light comes straight down.
+Everything else is decoration, to make it look like a real place:
+
+- a physically based sky (the Preetham model, from three.js's
+  `examples/jsm/objects/Sky.js`) with drifting clouds, and a sun you can put
+  at any time of day with the **Sun** slider. **overhead, as Vida's light
+  is** puts it straight above, so the shadows fall where the simulation's
+  shade does;
+- hundreds of thousands of blades of grass, swaying in rolling gusts of wind
+  and glowing when the sun is behind them (after well-known open-source
+  grass such as al-ro's instanced grass and James Smyth's Breath of the Wild
+  style grass);
+- water that reflects the world (the reflection maths is from three.js's
+  `examples/jsm/objects/Reflector.js`), is clear in the shallows and dark
+  where deep, glints in the sun and has foam along the shore, with light
+  patterns (caustics) on the bottom;
+- leaves that sway and glow when the sun shines through them, bark, soil,
+  rock and wet mud, low hills all round, dust in the air, birds overhead and
+  fireflies at dusk;
+- bloom, light shafts through the trees, the ACES filmic curve and a gentle
+  colour grade.
 
 Drag to turn, scroll or pinch to zoom, right-drag (or shift-drag, or two
-fingers) to move, and double-click to go back to the first view.
+fingers) to move, and double-click to go back to the first view. **Tour**
+circles slowly round the world; **wind and water** stops everything moving
+(and the page then only draws when something changes). **Quality** chooses
+how much grass, how many leaves and how sharp the shadows and reflections
+are: high on computers and medium on phones to begin with.
 
 It is drawn with [three.js](https://threejs.org), which is in
 `lib/three.min.js` (MIT licence, in `lib/three.LICENSE`). That is version
 r149, the last one that works as a plain script, so the page still works
-when opened straight from the disk. It is only loaded when the scene is
-first shown. A crowded world draws a few thousand clumps of leaves; on
-phones there are fewer, bigger clumps.
+when opened straight from the disk. The scene's own code is in `scene/`,
+one file per part (the list is at the top of `scene/scene.js`). None of it
+is loaded until the scene is first shown.
 
 ## The file
 
@@ -108,8 +131,9 @@ gzip -9 -n -c Output-sample/viewer.jsonl > viewer/sample/viewer.jsonl.gz
 ## Changing it
 
 - `index.html` is the layout, `viewer.css` the colours and spacing,
-  `scene.js` the natural scene, and `viewer.js` everything else. The
-  sections of `viewer.js` and `scene.js` are listed at their tops.
+  `scene/` the natural scene, and `viewer.js` everything else. The
+  sections of `viewer.js` and the files in `scene/` are listed at their
+  tops.
 - All colours are set once, at the top of `viewer.css`, for the light and
   the dark theme.
 - Anything new in the file should be added to `vjson.py` and to the list of

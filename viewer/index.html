@@ -65,8 +65,24 @@
 
     <figure class="card scene-card" id="scene-card" hidden>
       <figcaption>Natural scene <span class="note">(drag to turn, scroll or pinch to zoom, right-drag or two fingers to move, double-click to start again)</span></figcaption>
+      <div class="scene-controls">
+        <label>Sun
+          <input id="sun-slider" type="range" min="5.75" max="18.75" step="0.25" value="10.5" aria-label="Time of day">
+          <span id="sun-label" class="sun-label">10:30</span>
+        </label>
+        <label><input id="sun-overhead" type="checkbox"> overhead, as Vida's light is</label>
+        <label>Quality
+          <select id="quality-select">
+            <option value="high">high</option>
+            <option value="medium">medium</option>
+            <option value="low">low</option>
+          </select>
+        </label>
+        <label><input id="motion-check" type="checkbox" checked> wind and water</label>
+        <button id="tour-button" type="button" aria-pressed="false">Tour</button>
+      </div>
       <div class="canvas-box scene-box" id="scene-box"></div>
-      <p class="note scene-note" id="scene-note">Drawn to scale from the simulation: where each plant stands, its stem, the size and shape of its crown, the ground and the water. Leaves are darker where a plant got less light. The leaves, bark and grass, the leaf colour of each genus and the angle of the sun are decoration.</p>
+      <p class="note scene-note" id="scene-note">Drawn to scale from the simulation: where each plant stands, its stem, the size and shape of its crown, the ground and the water. Leaves are darker where a plant got less light, and the ground is darker and the grass thinner where the canopies shade it (straight down, as in Vida). Everything else is decoration: leaves, bark, grass, sky, clouds, water, birds, and the time of day.</p>
     </figure>
 
     <div class="views">
@@ -107,7 +123,6 @@
 <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
 <div id="drop-overlay" class="drop-overlay" hidden>Drop viewer.jsonl here</div>
 
-<script src="scene.js"></script>
 <script src="viewer.js"></script>
 </body>
 </html>

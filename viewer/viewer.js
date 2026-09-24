@@ -952,23 +952,34 @@ function drawScene() {
     { colourBy: colourBy, highlight: highlightSpecies, lightColour: lightColour });
 }
 
+// three.js and the scene's own files, in the order they need each other
+// (see the top of scene/scene.js). They are only loaded the first time the
+// scene is shown.
+var SCENE_SCRIPTS = ["lib/three.min.js", "scene/textures.js", "scene/sky.js", "scene/ground.js",
+  "scene/grass.js", "scene/trees.js", "scene/water.js", "scene/life.js", "scene/post.js", "scene/scene.js"];
+
 function loadThree(whenLoaded) {
-  // three.js is only loaded the first time the scene is shown
-  if (typeof THREE !== "undefined") {
+  if (typeof sceneStart !== "undefined") {
     whenLoaded(true);
     return;
   }
-  var script = document.createElement("script");
-  script.src = "lib/three.min.js";
-  script.addEventListener("load", onLoaded);
-  script.addEventListener("error", onFailed);
-  function onLoaded() {
-    whenLoaded(true);
+  var next = 0;
+  function loadNext() {
+    if (next >= SCENE_SCRIPTS.length) {
+      whenLoaded(true);
+      return;
+    }
+    var script = document.createElement("script");
+    script.src = SCENE_SCRIPTS[next];
+    next += 1;
+    script.addEventListener("load", loadNext);
+    script.addEventListener("error", onFailed);
+    document.head.appendChild(script);
   }
   function onFailed() {
     whenLoaded(false);
   }
-  document.head.appendChild(script);
+  loadNext();
 }
 
 function setView(mode) {
@@ -976,6 +987,9 @@ function setView(mode) {
   document.getElementById("view-select").value = mode;
   document.getElementById("scene-card").hidden = mode !== "scene";
   document.querySelector(".views").hidden = mode === "scene";
+  if (sceneReady) {
+    sceneSetActive(mode === "scene");
+  }
   if (mode === "scene" && !sceneReady) {
     loadThree(onThreeLoaded);
   } else {
@@ -989,10 +1003,11 @@ function setView(mode) {
 function onThreeLoaded(loaded) {
   if (!loaded || !sceneStart(document.getElementById("scene-box"))) {
     document.getElementById("scene-note").textContent =
-      "This browser can't draw the 3D scene (it needs WebGL, and lib/three.min.js next to this page).";
+      "This browser can't draw the 3D scene (it needs WebGL, and the lib and scene folders next to this page).";
     return;
   }
   sceneReady = true;
+  sceneSetActive(viewMode === "scene");
   sceneResize();
   drawEverything();
 }
