@@ -51,8 +51,9 @@ uses Vida's sums for germination, growth (the allometry), making and
 throwing seeds, random death, slow growth, buckling (Euler-Greenhill),
 stems off the world, crushing, classic shading (one canopy exactly, two or
 more with photons) and photosynthesis. With the same settings (a 100 m world,
-400 seeds, 40 cycles) its plant and seed counts stay within the spread of
-Vida's own runs for 30 cycles and end a few percent lower.
+400 seeds, 40 cycles, three runs each) its plant counts overlap the spread
+of Vida's own runs for all 40 cycles and end 5% lower; its seed counts
+overlap until cycle 35 and end 18% lower.
 
 What's different, and why:
 
