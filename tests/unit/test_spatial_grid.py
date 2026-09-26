@@ -45,8 +45,8 @@ def test_things_without_a_real_position_are_always_near():
     assert grid.near(0.0, 0.0, 1.0) == [lost]
 
 
-def random_world(runid, count):
-    rng = random.Random(runid)
+def random_world(rng_start, count):
+    rng = random.Random(rng_start)
     things = []
     for i in range(count):
         # mostly small seeds, some stems, a few big ones, packed closely
@@ -59,10 +59,10 @@ def random_world(runid, count):
     return things
 
 
-@pytest.mark.parametrize("runid", [1, 2, 3])
-def test_the_grid_finds_exactly_the_same_overlaps(in_repo_root, runid):
+@pytest.mark.parametrize("rng_start", [1, 2, 3])
+def test_the_grid_finds_exactly_the_same_overlaps(in_repo_root, rng_start):
     world = vworldr.garden()
-    world.soil = random_world(runid, 2000)
+    world.soil = random_world(rng_start, 2000)
     grid, largestRadius = world.makeOverlapGrid()
 
     for thing in world.soil:
@@ -117,15 +117,15 @@ def expected_overlaps(soil):
     return expected, last_looked_at
 
 
-@pytest.mark.parametrize("runid", [4, 5, 6])
-def test_shading_finds_exactly_the_same_overlaps(runid):
-    rng = random.Random(runid)
+@pytest.mark.parametrize("rng_start", [4, 5, 6])
+def test_shading_finds_exactly_the_same_overlaps(rng_start):
+    rng = random.Random(rng_start)
     soil = []
     for i in range(1500):
         soil.append(ShadeThing(rng, isSeed=rng.random() < 0.3))
     expected, last_looked_at = expected_overlaps(soil)
 
-    random.seed(runid)
+    random.seed(rng_start)
     vworldr.determineShade(ShadeWorld(soil))
 
     for plant in soil:
@@ -209,12 +209,12 @@ def remove_overlaps_the_slow_way(world):
                 break
 
 
-def crowded_world(runid):
+def crowded_world(rng_start):
     world = vworldr.garden()
     world.theRegions = []
     world.showProgressBar = False
     world.allowOverlaps = False
-    rng = random.Random(runid)
+    rng = random.Random(rng_start)
     for i in range(600):
         world.soil.append(random_crowd(rng, i))
     return world
@@ -236,12 +236,12 @@ def outcome(world):
     return alive, dead
 
 
-@pytest.mark.parametrize("runid", [7, 8, 9])
-def test_remove_overlaps_gives_the_same_result_as_checking_everything(in_repo_root, runid):
-    world = crowded_world(runid)
+@pytest.mark.parametrize("rng_start", [7, 8, 9])
+def test_remove_overlaps_gives_the_same_result_as_checking_everything(in_repo_root, rng_start):
+    world = crowded_world(rng_start)
     remove_overlaps_the_slow_way(world)
 
-    world_with_grid = crowded_world(runid)
+    world_with_grid = crowded_world(rng_start)
     world_with_grid.removeOverlaps()
 
     alive, dead = outcome(world_with_grid)

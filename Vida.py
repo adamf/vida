@@ -287,11 +287,12 @@ def main():
     
     print("*********Vida version: %s *********" % (vidaVersion))
 
-    ###Starting the random numbers from a run id makes a run repeatable:
-    ###the same run id and the same settings give exactly the same results.
-    if theRunid!=None:
-        random.seed(theRunid)
-        print("     Run id: %i" % (theRunid))
+    ###Starting the random number generator from a given value makes a run
+    ###repeatable: the same -rngstart and the same settings give exactly the
+    ###same results.
+    if rngStart!=None:
+        random.seed(rngStart)
+        print("     RNG start: %i" % (rngStart))
 
     CFDGtext=""
     CFDGtextDict={}
@@ -884,7 +885,7 @@ if __name__ == '__main__':
     parser.add_argument('-p', dest='deletePngFiles', action='store_true', required=False, help='Delete png files')
     parser.add_argument('-b', dest='showProgressBar', action='store_true', required=False, help='Show progress bars')
     parser.add_argument('-j', dest='exportJSON', action='store_true', required=False, help='Save each cycle for the web viewer (viewer/index.html)')
-    parser.add_argument('-runid', type=int, metavar='int', dest='theRunid', required=False, help='Run id: two runs with the same run id and settings give exactly the same results')    
+    parser.add_argument('-rngstart', type=int, metavar='int', dest='rngStart', required=False, help='Starting value for the random number generator: two runs with the same value and settings give exactly the same results')    
     parser.add_argument('-shade', type=str, dest='shadingModel', required=False, default='classic', choices=['classic', 'sunmap'], help='How shade is worked out: classic (overlap lists and random photons) or sunmap (a map of the sunlight, tallest plants first)')
     parser.add_argument('-shadecell', type=float, metavar='float', dest='sunmapCellSize', required=False, default=0.05, help='Size in meters of the squares of the sunlight map (-shade sunmap)')
     #more python2 to python3 fixes
