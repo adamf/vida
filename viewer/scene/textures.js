@@ -68,10 +68,10 @@ var SCENE_NOISE_GLSL = [
   "}"
 ].join("\n");
 
-function makeRandom(seed) {
+function makeRandom(start) {
   // A small random number generator that gives the same numbers for the same
-  // seed, so a tree or a patch of grass looks the same every time.
-  var state = seed >>> 0;
+  // start, so a tree or a patch of grass looks the same every time.
+  var state = start >>> 0;
   function next() {
     state = (state + 0x6D2B79F5) >>> 0;
     var t = state;
@@ -82,7 +82,7 @@ function makeRandom(seed) {
   return next;
 }
 
-function seedFor(x, y) {
+function randomStartFor(x, y) {
   // plants don't move, so their position identifies them
   return (Math.round(x * 1000) * 73856093) ^ (Math.round(y * 1000) * 19349663);
 }
@@ -148,10 +148,10 @@ function normalMapFrom(heightCanvas, strength) {
   return dataTexture(canvas, true);
 }
 
-function tilingNoiseCanvas(size, seed, waves, contrast) {
+function tilingNoiseCanvas(size, start, waves, contrast) {
   // Soft, random-looking heights that tile: a sum of waves that each fit a
   // whole number of times across the canvas.
-  var random = makeRandom(seed);
+  var random = makeRandom(start);
   var list = [];
   for (var w = 0; w < waves; w++) {
     list.push({
@@ -368,12 +368,12 @@ function leafTint(random) {
   return [1, 1, 1];
 }
 
-function leafSprayTexture(kind, seed) {
+function leafSprayTexture(kind, start) {
   // A spray of leaves of one kind on twigs, in greys (the tree's own colour
   // is multiplied in): "oval", "oak", "maple", "sweetgum" or "hickory".
   var canvas = newCanvas(512, 512);
   var context = canvas.getContext("2d");
-  var random = makeRandom(seed);
+  var random = makeRandom(start);
   context.strokeStyle = "rgba(70,60,50,0.9)";
   context.lineWidth = 3;
   for (var t = 0; t < 5; t++) {

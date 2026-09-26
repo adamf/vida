@@ -137,7 +137,7 @@ To make it again (for example after the file format changes), run from the
 top folder:
 
 ```
-python Vida.py -n sample -w 50 -s 150 -t 90 -m 3000 -seed 11 -j -i "Terrain_files/CatLand with xlsx" -iwater 1.5 -a n -f n
+python Vida.py -n sample -w 50 -s 150 -t 90 -m 3000 -runid 11 -j -i "Terrain_files/CatLand with xlsx" -iwater 1.5 -a n -f n
 gzip -9 -n -c Output-sample/viewer.jsonl > viewer/sample/viewer.jsonl.gz
 ```
 

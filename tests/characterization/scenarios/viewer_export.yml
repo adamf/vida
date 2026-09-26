@@ -16,5 +16,5 @@ events:
     - Garden:
         - {waterLevel: 2.0}
 stages:
-  - seed: 1701
+  - runid: 1701
     args: [-n, viewer, -w, "40", -s, "40", -t, "12", -m, "150", -i, terrain, -iwater, "1.0", -e, events.yml, -j, -a, a, -f, n]

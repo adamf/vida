@@ -178,11 +178,11 @@ function clumpCoreGeometry() {
   return geometry;
 }
 
-function clumpLeavesGeometry(cards, cardSize, seed) {
+function clumpLeavesGeometry(cards, cardSize, start) {
   // Many small squares ("cards") with leaves drawn on them, scattered over a
   // ball of radius 1, facing roughly outwards. They are lit as if facing
   // outwards and a little up, so a crown looks like one soft mass of leaves.
-  var random = makeRandom(seed);
+  var random = makeRandom(start);
   var positions = [];
   var normals = [];
   var uvs = [];
@@ -321,7 +321,7 @@ function crownClumps(x, top, z, radius, crown, clumpBudget) {
   // [x, y, z, clump radius, height in the crown], filling the crown's
   // outline (crown.form), `radius` wide at its widest and crown.depth deep,
   // with its top at `top`. The same plant always gets the same clumps.
-  var random = makeRandom(seedFor(x, z));
+  var random = makeRandom(randomStartFor(x, z));
   var depth = crown.depth;
   var size = Math.max(0.04, Math.min(1.6, Math.min(radius, depth) * 0.6));
   var needed = estimateClumps(crown.form, radius, depth, size);
@@ -558,7 +558,7 @@ function placeTrees(state, theRun, cycle, options, clumpTotal) {
     var leavesMesh = meshes[style + "Leaves"];
     var coreMesh = meshes[style + "Core"];
     var clumps = crowns[p];
-    var turnRandom = makeRandom(seedFor(x, y) + 3);
+    var turnRandom = makeRandom(randomStartFor(x, y) + 3);
     for (var c = 0; c < clumps.length; c++) {
       var clump = clumps[c];
       place.set(clump[0], clump[1], clump[2]);

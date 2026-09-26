@@ -12,7 +12,7 @@ events:
     - Garden:
         - {lightIntensity: 0.8}
 stages:
-  - seed: 2718
+  - runid: 2718
     args: [-n, sunmap, -w, "30", -s, "80", -t, "16", -m, "400", -e, events.yml, -shade, sunmap, -a, a, -f, a]
-  - seed: 3141
+  - runid: 3141
     args: [-n, sunmap_cells, -w, "20", -s, "50", -t, "10", -m, "300", -shade, sunmap, -shadecell, "0.2", -a, a, -f, n]

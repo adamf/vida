@@ -67,7 +67,7 @@ a few things from the outside before starting `Vida.py`:
 
 | Patched | Why |
 |---|---|
-| `random` is seeded per scenario | Vida is stochastic. |
+| `random` starts from each stage's `runid` | Vida is stochastic. |
 | `time.time()` returns 1, 2, 3, ... | Vida records when each seed was planted and uses it to break ties between overlapping objects of equal mass. |
 | `uuid.uuid4()` returns a counter | Object names are uuids. |
 | `os.listdir()` and `glob.glob()` are sorted | Directory order depends on the file system, and Vida picks "random" species by their position in the list of files in `Species/`. |
@@ -113,7 +113,7 @@ these tests; they only notice changes to the code.
 | `species_event` | "Species" events that change a species' parameters part way through a run. |
 | `seed_event_from_file` | A "Seed" event that adds seeds from a placement file part way through a run. |
 | `dispersal_methods_0_1_2` | Seed dispersal methods 0, 1 and 2, on flat ground and on terrain. |
-| `seed_option` | Two runs with the same `-seed` (see `test_seed_option_repeats_a_run_exactly`). |
+| `runid_option` | Two runs with the same `-runid` (see `test_runid_option_repeats_a_run_exactly`). |
 | `viewer_export` | The `-j` file for the web viewer, with terrain, water and a region. |
 
 The scenarios run about 80-93% of the lines in `vplantr.py`, `vworldr.py` and
@@ -137,7 +137,7 @@ world_preferences: {allowOverlaps: true}   # changes to Vida World Preferences.y
 files: {placement.csv: placement/mixed.csv} # copied from inputs/ into the run folder
 events: {10: [{Garden: [{lightIntensity: 0.5}]}]}   # written to events.yml
 stages:                      # one or more runs of Vida.py, in the same folder
-  - seed: 1
+  - runid: 1
     args: [-n, name, -w, "20", -s, "10", -t, "10", -a, a, -f, a]
 ```
 

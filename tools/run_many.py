@@ -9,18 +9,18 @@ order they finish in changes.
 
 Run it from the folder that has Vida.py in it. Examples:
 
-    # the same simulation with the random seeds 1 to 8, four at a time
-    python tools/run_many.py -seeds 1-8 -jobs 4 -- -n forest -w 100 -s 400 -t 50
+    # the same simulation with the run ids 1 to 8, four at a time
+    python tools/run_many.py -runids 1-8 -jobs 4 -- -n forest -w 100 -s 400 -t 50
 
     # every line of runs.txt is the options for one run, e.g.
-    #     -n dry -w 100 -s 400 -t 50 -seed 1
-    #     -n wet -w 100 -s 400 -t 50 -seed 1
+    #     -n dry -w 100 -s 400 -t 50 -runid 1
+    #     -n wet -w 100 -s 400 -t 50 -runid 1
     python tools/run_many.py -file runs.txt
 
-With -seeds, each run is named after the -n name and its seed (forest-seed1,
-forest-seed2, ...). Each run's output goes where Vida puts it
-(Output-forest-seed1/ and so on), and what it prints goes to a log file next
-to it (Output-forest-seed1.log). -jobs is how many run at once; it starts
+With -runids, each run is named after the -n name and its run id (forest-run1,
+forest-run2, ...). Each run's output goes where Vida puts it
+(Output-forest-run1/ and so on), and what it prints goes to a log file next
+to it (Output-forest-run1.log). -jobs is how many run at once; it starts
 at the number of cores.
 """
 
@@ -32,18 +32,18 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 
-def readSeeds(text):
+def readRunids(text):
     # "1-8" or "1,3,5" or "1-4,10" -> [1, 2, ...]
-    seeds = []
+    runids = []
     for part in text.split(","):
         part = part.strip()
         if "-" in part:
             first, last = part.split("-")
-            for seed in range(int(first), int(last) + 1):
-                seeds.append(seed)
+            for runid in range(int(first), int(last) + 1):
+                runids.append(runid)
         elif part:
-            seeds.append(int(part))
-    return seeds
+            runids.append(int(part))
+    return runids
 
 
 def nameOf(options):
@@ -54,11 +54,11 @@ def nameOf(options):
     return None
 
 
-def runsForSeeds(seeds, options):
-    # One run per seed: the same options, with its own -seed and name.
-    if "-seed" in options:
-        sys.exit("run_many: leave -seed out of the options; -seeds sets it for each run")
-    baseName = nameOf(options) or "run"
+def runsForRunids(runids, options):
+    # One run per run id: the same options, with its own -runid and name.
+    if "-runid" in options:
+        sys.exit("run_many: leave -runid out of the options; -runids sets it for each run")
+    baseName = nameOf(options) or "default"
     rest = []
     skipNext = False
     for option in options:
@@ -69,9 +69,9 @@ def runsForSeeds(seeds, options):
         else:
             rest.append(option)
     runs = []
-    for seed in seeds:
-        name = "%s-seed%d" % (baseName, seed)
-        runs.append(["-n", name, "-seed", str(seed)] + rest)
+    for runid in runids:
+        name = "%s-run%d" % (baseName, runid)
+        runs.append(["-n", name, "-runid", str(runid)] + rest)
     return runs
 
 
@@ -104,10 +104,10 @@ def runOne(options):
 
 def main():
     parser = argparse.ArgumentParser(description="Run several Vida simulations at once.")
-    parser.add_argument("-seeds", help="random seeds to run, e.g. 1-8 or 1,3,5")
+    parser.add_argument("-runids", help="run ids to run, e.g. 1-8 or 1,3,5")
     parser.add_argument("-file", help="a file with the options for one run on each line")
     parser.add_argument("-jobs", type=int, default=os.cpu_count() or 1, help="how many to run at once (default: the number of cores)")
-    parser.add_argument("options", nargs=argparse.REMAINDER, help="after --, Vida's options for every run (with -seeds)")
+    parser.add_argument("options", nargs=argparse.REMAINDER, help="after --, Vida's options for every run (with -runids)")
     arguments = parser.parse_args()
     options = arguments.options
     if options and options[0] == "--":
@@ -115,14 +115,14 @@ def main():
 
     if not os.path.exists("Vida.py"):
         sys.exit("run_many: run this from the folder that has Vida.py in it")
-    if arguments.seeds and arguments.file:
-        sys.exit("run_many: use -seeds or -file, not both")
-    if arguments.seeds:
-        runs = runsForSeeds(readSeeds(arguments.seeds), options)
+    if arguments.runids and arguments.file:
+        sys.exit("run_many: use -runids or -file, not both")
+    if arguments.runids:
+        runs = runsForRunids(readRunids(arguments.runids), options)
     elif arguments.file:
         runs = runsFromFile(arguments.file)
     else:
-        sys.exit("run_many: say which runs, with -seeds or -file (see python tools/run_many.py -h)")
+        sys.exit("run_many: say which runs, with -runids or -file (see python tools/run_many.py -h)")
 
     jobs = max(1, arguments.jobs)
     print("%d runs, %d at a time" % (len(runs), jobs))

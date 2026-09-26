@@ -56,32 +56,32 @@ var GRASS_VERTEX_PARTS = [
 
 var GRASS_BEGIN_VERTEX = [
   "float along = position.y;",
-  "float seed = grassShape.w;",
+  "float randomness = grassShape.w;",
   "float light = shadeLightAt(grassPlace.xz);",
   // shorter and fewer in deep shade, none under water
   "float tall = grassShape.y * mix(0.35, 1.0, smoothstep(0.02, 0.5, light));",
-  "float keep = step(seed, smoothstep(0.0, 0.3, light) * 0.8 + 0.2);",
+  "float keep = step(randomness, smoothstep(0.0, 0.3, light) * 0.8 + 0.2);",
   "keep *= step(waterLevel + 0.05, grassPlace.y);",
   // shorter towards the edge of where the grass grows, so it fades into the ground
   "float edge = max(abs(grassPlace.x), abs(grassPlace.z));",
-  "tall *= 1.0 - smoothstep(grassReach * 0.55, grassReach, edge + seed * grassReach * 0.2);",
+  "tall *= 1.0 - smoothstep(grassReach * 0.55, grassReach, edge + randomness * grassReach * 0.2);",
   "tall *= keep;",
   // a few wildflowers: one stem in forty, in the sun, a little taller than
   // the grass, with a head at the top
-  "float flower = step(0.975, fract(seed * 29.3)) * step(0.6, light);",
+  "float flower = step(0.975, fract(randomness * 29.3)) * step(0.6, light);",
   "tall *= 1.0 + flower * 0.25;",
   "float wide = grassShape.z * (1.0 - along * 0.85) * keep;",
   "wide = mix(wide, grassShape.z * (along > 0.7 ? 1.0 : 0.3) * keep, flower);",
   "vec3 blade = vec3(position.x * wide, along * tall, 0.0);",
   // a natural curve, each blade its own
-  "blade.z += along * along * tall * (0.15 + seed * 0.45);",
+  "blade.z += along * along * tall * (0.15 + randomness * 0.45);",
   "float turnCos = cos(grassShape.x);",
   "float turnSin = sin(grassShape.x);",
   "blade = vec3(blade.x * turnCos - blade.z * turnSin, blade.y, blade.x * turnSin + blade.z * turnCos);",
   // wind: gusts rolling across the field, and each blade's own flutter
   "vec2 windWay = normalize(vec2(1.0, 0.35));",
   "float gust = sceneNoise(grassPlace.xz * 0.07 - windWay * time * 0.8);",
-  "float flutter = sin(time * 2.3 + seed * 6.2831 + dot(grassPlace.xz, windWay) * 0.7) * 0.22;",
+  "float flutter = sin(time * 2.3 + randomness * 6.2831 + dot(grassPlace.xz, windWay) * 0.7) * 0.22;",
   "float bend = (gust * gust * 1.3 + flutter) * windStrength;",
   "blade.xz += windWay * bend * along * along * tall;",
   "blade.y -= abs(bend) * along * along * tall * 0.3;",
@@ -89,12 +89,12 @@ var GRASS_BEGIN_VERTEX = [
   // colour: dark at the root, lighter at the tip, drier outside the world
   // and in the sun, darker in the shade
   "float outside = max(abs(grassPlace.x), abs(grassPlace.z)) - worldSize * 0.5;",
-  "vec3 tipColour = mix(vec3(0.2, 0.36, 0.05), vec3(0.34, 0.42, 0.1), fract(seed * 7.31));",
-  "tipColour = mix(tipColour, vec3(0.48, 0.4, 0.17), smoothstep(0.0, worldSize * 0.25, outside) * 0.35 + step(0.93, fract(seed * 13.7)) * 0.5);",
+  "vec3 tipColour = mix(vec3(0.2, 0.36, 0.05), vec3(0.34, 0.42, 0.1), fract(randomness * 7.31));",
+  "tipColour = mix(tipColour, vec3(0.48, 0.4, 0.17), smoothstep(0.0, worldSize * 0.25, outside) * 0.35 + step(0.93, fract(randomness * 13.7)) * 0.5);",
   "vGrassColour = mix(tipColour * vec3(0.35, 0.45, 0.3), tipColour, along) * mix(0.5, 1.0, smoothstep(0.0, 0.6, light));",
   // flower heads: white, yellow or violet
-  "vec3 petals = mix(vec3(0.85, 0.82, 0.72), vec3(0.9, 0.62, 0.05), step(0.55, fract(seed * 5.1)));",
-  "petals = mix(petals, vec3(0.42, 0.22, 0.7), step(0.82, fract(seed * 3.7)));",
+  "vec3 petals = mix(vec3(0.85, 0.82, 0.72), vec3(0.9, 0.62, 0.05), step(0.55, fract(randomness * 5.1)));",
+  "petals = mix(petals, vec3(0.42, 0.22, 0.7), step(0.82, fract(randomness * 3.7)));",
   "vGrassColour = mix(vGrassColour, petals, flower * step(0.7, along));",
   // shining through the blade when the sun is behind it
   "vec3 towards = normalize(transformed - cameraPosition);",

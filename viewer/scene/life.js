@@ -6,7 +6,7 @@
 "use strict";
 
 var GLOW_VERTEX = [
-  "attribute float seed;",
+  "attribute float randomness;",
   "uniform float time;",
   "uniform float size;",
   "uniform float kind;",
@@ -15,19 +15,19 @@ var GLOW_VERTEX = [
   "varying float vBright;",
   "void main() {",
   "  vec3 place = position;",
-  "  float t = time * (kind > 0.5 ? 0.35 : 0.12) + seed * 40.0;",
+  "  float t = time * (kind > 0.5 ? 0.35 : 0.12) + randomness * 40.0;",
   // wander slowly round where it started, and wrap round a box that
   // follows the middle of the view
-  "  place += vec3(sin(t * 1.3 + seed * 9.0), sin(t * 0.9 + seed * 5.0) * 0.4, cos(t * 1.1 + seed * 7.0)) * (kind > 0.5 ? 1.2 : 2.0);",
+  "  place += vec3(sin(t * 1.3 + randomness * 9.0), sin(t * 0.9 + randomness * 5.0) * 0.4, cos(t * 1.1 + randomness * 7.0)) * (kind > 0.5 ? 1.2 : 2.0);",
   "  place.xz = centre.xz + mod(place.xz - centre.xz + spread * 0.5, spread) - spread * 0.5;",
   "  vec4 mvPosition = modelViewMatrix * vec4(place, 1.0);",
   "  gl_Position = projectionMatrix * mvPosition;",
-  "  gl_PointSize = size * (kind > 0.5 ? 1.0 : 0.6 + seed) / max(1.0, -mvPosition.z) * 60.0;",
+  "  gl_PointSize = size * (kind > 0.5 ? 1.0 : 0.6 + randomness) / max(1.0, -mvPosition.z) * 60.0;",
   // fireflies blink; dust sparkles now and then
   "  if (kind > 0.5) {",
-  "    vBright = pow(max(0.0, sin(time * (1.5 + seed) + seed * 30.0)), 6.0);",
+  "    vBright = pow(max(0.0, sin(time * (1.5 + randomness) + randomness * 30.0)), 6.0);",
   "  } else {",
-  "    vBright = 0.35 + 0.65 * pow(max(0.0, sin(time * 0.7 + seed * 50.0)), 8.0);",
+  "    vBright = 0.35 + 0.65 * pow(max(0.0, sin(time * 0.7 + randomness * 50.0)), 8.0);",
   "  }",
   "}"
 ].join("\n");
@@ -46,16 +46,16 @@ var GLOW_FRAGMENT = [
 function makeGlowPoints(state, count, kind, colour) {
   var random = makeRandom(kind === 1 ? 71 : 53);
   var positions = new Float32Array(count * 3);
-  var seeds = new Float32Array(count);
+  var randomness = new Float32Array(count);
   for (var i = 0; i < count; i++) {
     positions[i * 3] = (random() - 0.5) * 40;
     positions[i * 3 + 1] = kind === 1 ? 0.3 + random() * 2.2 : 0.4 + random() * 9;
     positions[i * 3 + 2] = (random() - 0.5) * 40;
-    seeds[i] = random();
+    randomness[i] = random();
   }
   var geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute("seed", new THREE.Float32BufferAttribute(seeds, 1));
+  geometry.setAttribute("randomness", new THREE.Float32BufferAttribute(randomness, 1));
   var material = new THREE.ShaderMaterial({
     uniforms: {
       time: state.uniforms.time,
