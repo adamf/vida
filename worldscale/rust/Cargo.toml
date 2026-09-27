@@ -1,26 +1,16 @@
-[package]
-name = "worldscale_core"
-version = "0.1.0"
+# Vida's world-scale prototype in Rust: three crates that build together.
+#   engine   the model and one rank's share of the world (no Python, no MPI)
+#   python   worldscale_core, the Python module (built with maturin)
+#   cli      the worldscale command, on one computer or over MPI
+[workspace]
+members = ["engine", "python", "cli"]
+resolver = "2"
+
+[workspace.package]
+version = "0.2.0"
 edition = "2021"
-description = "The compiled engine for Vida's world-scale prototype: the same model as worldscale/forest.py, one rank's work at a time"
 # licence: see LICENSE.txt at the top of the Vida repository
 publish = false
-
-[lib]
-name = "worldscale_core"
-crate-type = ["cdylib"]
-
-[dependencies]
-# abi3: one build works with every Python from 3.8 on
-pyo3 = { version = "0.29", features = ["extension-module", "abi3-py38"] }
-numpy = "0.29"
-# maths functions written in Rust, so log, pow, sin and so on give the same
-# answers on every computer (not whatever the system's maths library says)
-libm = "0.2"
-
-[features]
-# use the computer's own maths library (faster; last digits may differ between computers)
-system-maths = []
 
 [profile.release]
 opt-level = 3

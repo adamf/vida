@@ -37,8 +37,9 @@ From the folder with `Vida.py` in it:
 
 Options: `-w` world width (m), `-tile` tile width (m), `-s` starting seeds
 per hectare, `-t` cycles, `-rngstart`, `-photons` (most photons per plant),
-`-partition strips|curve|scattered`, `-shuffle`, `-engine numpy|rust`, and for comparison the old
-ways, `-rng queue` and `-crush sequential`. MPI needs `mpi4py` and an MPI
+`-partition strips|curve|scattered`, `-shuffle`, `-engine numpy|rust|rust-world`,
+`-threads` (cores per rank, for the Rust engines), and for comparison the
+old ways, `-rng queue` and `-crush sequential`. MPI needs `mpi4py` and an MPI
 library (`pip install mpi4py mpich` works on Linux).
 
 The tests (`tests/unit/test_worldscale.py`) run several ranks as threads,
@@ -46,22 +47,50 @@ so they don't need MPI.
 
 ## The compiled engine
 
-`-engine rust` does each rank's sums with the Rust code in `rust/` (see
-`rust/README.md` for building it and why Rust). It grows exactly the same
-trees as the numpy engine, with values the same to within one part in a
-billion, and like it gives the same forest on any number of ranks.
+`rust/` has the same model and the same world written in Rust (see
+`rust/README.md` for building it and why Rust). There are three ways to use
+it, and they all grow exactly the same forest, bit for bit, on any number of
+ranks and cores:
 
-On the 800 m world (40 cycles, ending with about 253,000 trees and seeds):
+- `-engine rust`: `world.py` runs the cycle and the Rust engine does the
+  sums.
+- `-engine rust-world`: every step of the cycle is in Rust, and Python only
+  starts it and passes letters between ranks.
+- the `worldscale` command: no Python at all, on one computer (with
+  `-ranks` to run several ranks as threads) or over MPI.
 
-| | numpy | Rust |
-|---|---|---|
-| 1 process | 20.4 s | 6.7 s |
-| 4 processes | 6.0 s | 2.6 s |
-| per tree per cycle, grown forest, one core | 9.4 µs | 2.2 µs |
+Inside each rank, the Rust engine shares the work out between the
+computer's cores, so a run can use MPI between computers and threads inside
+each one. Its values are the same as the numpy engine's to within one part in
+a billion (its maths functions are its own), with the same births, deaths
+and crushes.
 
-What's left is mostly Vida's own maths (about seven `pow` and `log` a plant
-a cycle, and hundreds of photons for each shaded plant), plus the Python
-that moves trees between steps and the pickled messages between ranks.
+On the 800 m world (40 cycles, ending with about 253,000 trees and seeds), on
+a computer with 4 cores:
+
+| | 1 core | 4 cores, as threads | 4 MPI ranks |
+|---|---|---|---|
+| numpy | 20.4 s | | 5.8 s |
+| `-engine rust` | 5.9 s | 3.1 s | 2.1 s |
+| `-engine rust-world` | 4.8 s | 2.3 s | 1.6 s |
+| `worldscale` command | 5.3 s | 2.3 s | 1.4 s |
+
+A tree costs about 1.8 µs a cycle on one core (numpy: 10 µs), most of it
+Vida's own maths (about seven `pow` and `log` a plant a cycle, and hundreds
+of photons for each shaded plant). With 4 million trees on one core it's
+2.2 µs, as more of the trees' neighbours are out of the processor's cache.
+Ranks scale better than threads (3.7 times on 4 cores, against 2.3),
+because some of each step (filing trees into the grid, taking dead ones
+out) is still done on one core.
+
+Bigger worlds, with the `worldscale` command on the same 4 cores:
+
+| World | Trees and seeds after 40 cycles | 1 core | 4 threads | 4 MPI ranks | Memory |
+|---|---|---|---|---|---|
+| 3.2 km (1,024 ha) | 4.0 million | 91 s | 39 s | 26 s | 2.3 GB |
+| 6.4 km (4,096 ha) | 16.2 million | | 4.1 min | | 8.7 GB |
+
+That's about 540 bytes per tree or seed at the busiest moment of a cycle.
 
 ## The model
 
@@ -102,6 +131,7 @@ What's different, and why:
   Vida's sums done on whole columns at once
 - `comm.py`: how ranks talk (one process, threads for the tests, or MPI)
 - `world.py`: tiles, halos, seeds moving between ranks, and the cycle
-- `compiled.py`: the same functions as `forest.py`, done by the Rust engine
-- `rust/`: the Rust engine
+- `compiled.py`: the same functions as `forest.py`, done by the Rust engine,
+  and `CompiledWorld`, a rank's whole world in Rust
+- `rust/`: the Rust engine, the Python module and the `worldscale` command
 - `run.py`: the command line

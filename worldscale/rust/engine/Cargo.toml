@@ -1,0 +1,19 @@
+[package]
+name = "worldscale-engine"
+description = "The model of Vida's world-scale prototype, and one rank's share of the world"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+# maths functions written in Rust, so log, pow, sin and so on give the same
+# answers on every computer (not whatever the system's maths library says)
+libm = "0.2"
+# sharing each rank's work out between the cores of its computer
+rayon = "1"
+# reading Vida's species files and world preferences
+serde_yaml = "0.9"
+
+[features]
+# use the computer's own maths library (faster; last digits may differ between computers)
+system-maths = []

@@ -40,7 +40,9 @@ def readOptions(arguments=None):
     parser.add_argument("-rng", default="addressed", choices=["addressed", "queue"], help="addressed random numbers, or the old queue")
     parser.add_argument("-crush", default="rounds", choices=["rounds", "sequential"], help="decide overlaps in rounds, or the old way")
     parser.add_argument("-shuffle", action="store_true", help="shuffle each rank's trees every cycle (it shouldn't matter)")
-    parser.add_argument("-engine", default="numpy", choices=["numpy", "rust"], help="numpy (forest.py) or the compiled Rust engine")
+    parser.add_argument("-engine", default="numpy", choices=["numpy", "rust", "rust-world"],
+                        help="numpy (forest.py), the Rust engine's sums (rust) or every step in Rust (rust-world)")
+    parser.add_argument("-threads", type=int, default=0, help="cores each rank uses, for the Rust engines (0: all of them)")
     parser.add_argument("-species", default="Species", help="folder of species files")
     parser.add_argument("-mpi", action="store_true", help="run on MPI (use with mpiexec)")
     parser.add_argument("-json", default=None, help="also write the results to this file")
@@ -57,8 +59,8 @@ def runWorld(comm, options):
                                seedsPerHectare=options.seedsPerHectare, rngStart=options.rngStart,
                                photonLimit=options.photonLimit, partition=options.partition,
                                rng=options.rng, crush=options.crush, shuffle=options.shuffle,
-                               engine=options.engine)
-    theWorld = worlds.TiledWorld(comm, settings, table, species.WorldSettings(vidaFolder))
+                               engine=options.engine, threads=options.threads)
+    theWorld = worlds.makeWorld(comm, settings, table, species.WorldSettings(vidaFolder))
     cycles = []
     started = time.perf_counter()
     for cycle in range(options.cycles):
@@ -74,7 +76,7 @@ def runWorld(comm, options):
     timings = {}
     for name in theWorld.timings:
         timings[name] = comm.allreduce(theWorld.timings[name], "max")
-    rows = comm.allreduce(len(theWorld.forest), "max")
+    rows = comm.allreduce(theWorld.rowCount(), "max")
     traffic = {}
     for name in theWorld.traffic:
         traffic[name] = comm.allreduce(theWorld.traffic[name], "sum")
@@ -86,6 +88,9 @@ def runWorld(comm, options):
 
 def main():
     options = readOptions()
+    if options.threads and options.engine == "rust":
+        from worldscale import compiled
+        compiled.setThreads(options.threads)
     if options.mpi:
         comm = comms.MpiComm()
     else:

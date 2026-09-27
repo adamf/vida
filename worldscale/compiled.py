@@ -7,11 +7,16 @@
     You should have received a copy of academic software agreement along with Vida. If not, see <https://github.com/seanth/Vida/blob/master/LICENSE.txt>.
 """
 
-###The compiled engine: the same functions, with the same arguments, as
-###forest.py, done by the Rust code in worldscale/rust (the worldscale_core
-###module). world.py uses these instead of forest.py's with -engine rust.
+###The compiled engine, done by the Rust code in worldscale/rust (the
+###worldscale_core module), used two ways:
+###  -engine rust: the functions below, with the same arguments as
+###      forest.py's, which world.py uses instead of forest.py's
+###  -engine rust-world: CompiledWorld, one rank's whole share of the world
+###      with every step of the cycle in Rust, used instead of world.py's
+###      TiledWorld. It grows exactly the same forest as -engine rust.
+###Both share each rank's work out between the computer's cores.
 ###
-###Build it once, from worldscale/rust:  maturin develop --release
+###Build it once, from worldscale/rust/python:  maturin develop --release
 ###
 ###The Rust code does the same sums in the same order. Its maths functions
 ###(log, pow, sin...) are its own, so the last digit of a result can differ
@@ -110,3 +115,40 @@ def randomBlocks(rngStart, ids, cycle, purpose, index):
     ids, index = numpy.broadcast_arrays(ids, index)
     return core.random_blocks(rngStart & ALL_BITS, numpy.ascontiguousarray(ids), cycle, purpose,
                               numpy.ascontiguousarray(index))
+
+
+def setThreads(threads):
+    ###how many cores the functions above use (only before they first run)
+    core.set_threads(threads)
+
+
+class CompiledWorld:
+    ###One rank's share of the world, with every step of the cycle done by
+    ###the Rust engine (worldscale_core.RankWorld). It works like
+    ###world.TiledWorld, and talks to the other ranks through the same comm.
+    def __init__(self, comm, settings, table, worldSettings):
+        if settings.rng != "addressed" or settings.crush != "rounds":
+            raise ValueError("the Rust world only has addressed random numbers and crushing in rounds")
+        self.comm = comm
+        self.settings = settings
+        worldSettings.worldSize = settings.worldSize
+        self.world = core.RankWorld(comm, table, worldSettings, settings.worldSize, settings.tileSize,
+                                    settings.seedsPerHectare, settings.rngStart, settings.photonLimit,
+                                    settings.partition, settings.shuffle, settings.threads)
+        self.random = None
+        self.cycle = 0
+        self.timings = self.world.timings()
+        self.traffic = self.world.traffic()
+
+    def runCycle(self):
+        result = self.world.run_cycle()
+        self.cycle = self.cycle + 1
+        self.timings = self.world.timings()
+        self.traffic = self.world.traffic()
+        return result
+
+    def fingerprint(self):
+        return self.world.fingerprint()
+
+    def rowCount(self):
+        return self.world.rows()

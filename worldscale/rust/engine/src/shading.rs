@@ -5,20 +5,27 @@
 // at the first (tallest) canopy it lands in, getting through that one with
 // the canopy's transmittance. Each photon's random numbers have their own
 // address (the plant, the cycle and the photon's number).
+//
+// Each plant's shade is worked out on its own, so the plants are shared out
+// between the cores; the answer for each plant doesn't depend on which core
+// did it.
+
+use rayon::prelude::*;
+use std::cmp::Ordering;
 
 use crate::maths;
-use std::cmp::Ordering;
 
 use crate::pairs;
 use crate::philox;
 use crate::settings::{Species, World};
 
-/// Taller first; for the same height, the lower id first
-fn compare_taller(a: &(f64, u64, usize), b: &(f64, u64, usize)) -> Ordering {
-    match b.0.partial_cmp(&a.0) {
+/// Which of two plants comes first: the taller; for the same height, the
+/// one with the lower id (forest.tallerFirst's order)
+fn compare_taller(a: usize, b: usize, height: &[f64], ids: &[u64]) -> Ordering {
+    match height[b].partial_cmp(&height[a]) {
         Some(Ordering::Less) => Ordering::Less,
         Some(Ordering::Greater) => Ordering::Greater,
-        _ => a.1.cmp(&b.1),
+        _ => ids[a].cmp(&ids[b]),
     }
 }
 
@@ -70,30 +77,20 @@ pub fn shade(owned: usize, x: &[f64], y: &[f64], r: &[f64], is_plant: &[bool], h
     }
     let (first, second) = pairs::find_pairs(&plant_x, &plant_y, &plant_r);
 
-    // everyone's place, tallest first
-    let mut order = Vec::with_capacity(count);
-    for row in 0..count {
-        order.push((height[row], ids[row], row));
-    }
-    order.sort_by(compare_taller);
-    let mut place = vec![0usize; count];
-    for (position, entry) in order.iter().enumerate() {
-        place[entry.2] = position;
-    }
-
     // who covers whom: the taller one covers the other. Only our own
     // plants' shade is ours to work out.
-    let mut covering: Vec<(usize, usize, usize)> = Vec::new();
+    let mut covering: Vec<(usize, usize)> = Vec::new();
     for pair in 0..first.len() {
         let a = plants[first[pair] as usize];
         let b = plants[second[pair] as usize];
-        let (shaded, cover) = if place[a] < place[b] { (b, a) } else { (a, b) };
+        let (shaded, cover) = if compare_taller(a, b, height, ids) == Ordering::Less { (b, a) } else { (a, b) };
         if shaded < owned {
-            covering.push((shaded, place[cover], cover));
+            covering.push((shaded, cover));
         }
     }
-    // each plant's covers, tallest first
-    covering.sort_unstable();
+    // each plant's covers, tallest first (ids are all different, so there
+    // is only one right order)
+    covering.par_sort_unstable_by(|p, q| p.0.cmp(&q.0).then_with(|| compare_taller(p.1, q.1, height, ids)));
     let mut cover_count = vec![0usize; owned];
     let mut first_cover = vec![0usize; owned];
     for (position, entry) in covering.iter().enumerate() {
@@ -104,14 +101,13 @@ pub fn shade(owned: usize, x: &[f64], y: &[f64], r: &[f64], is_plant: &[bool], h
     }
 
     let light = world.light_intensity;
-    let mut covered = vec![0.0; owned];
-    for row in 0..owned {
+    let shade_one = |row: usize| -> f64 {
         let radius = r[row];
         let area_total = 3.14 * radius * radius;
         let mut exposed = light;
         if is_plant[row] && cover_count[row] == 1 {
             // one cover: the overlapping area, worked out exactly
-            let other = covering[first_cover[row]].2;
+            let other = covering[first_cover[row]].1;
             let mut area = lens_area(x[row], y[row], radius, x[other], y[other], r[other]);
             area = area - area * table.canopy_transmittance[species[other] as usize];
             exposed = if area_total > 0.0 { (area_total - area) / area_total } else { 1.0 } * light;
@@ -133,7 +129,7 @@ pub fn shade(owned: usize, x: &[f64], y: &[f64], r: &[f64], is_plant: &[bool], h
                 let photon_y = y[row] + distance * sine;
                 let mut blocked = false;
                 for entry in covers {
-                    let canopy = entry.2;
+                    let canopy = entry.1;
                     // inside the canopy? (comparing squared distances: exact
                     // arithmetic, so the same on every computer; forest.py
                     // uses hypot, which can only differ right on the edge)
@@ -150,7 +146,8 @@ pub fn shade(owned: usize, x: &[f64], y: &[f64], r: &[f64], is_plant: &[bool], h
             }
             exposed = (hits as f64) / (photons as f64) * light;
         }
-        covered[row] = area_total - area_total * exposed;
-    }
+        area_total - area_total * exposed
+    };
+    let covered: Vec<f64> = (0..owned).into_par_iter().with_min_len(256).map(shade_one).collect();
     covered
 }

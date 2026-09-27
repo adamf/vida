@@ -21,8 +21,18 @@ jobs:
       - name: Build the world-scale prototype's compiled engine (Rust)
         run: |
           pip install maturin
-          maturin build --release -m worldscale/rust/Cargo.toml -o dist
+          maturin build --release -m worldscale/rust/python/Cargo.toml -o dist
           pip install dist/worldscale_core-*.whl
       - name: Check every Python file compiles
         run: python -m compileall -q -x '/\.git/' .
       - run: pytest -n auto
+
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test the world-scale prototype's Rust engine, and build the worldscale command
+        working-directory: worldscale/rust
+        run: |
+          cargo test --release -p worldscale-engine
+          cargo build --release -p worldscale-cli

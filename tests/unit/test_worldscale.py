@@ -311,3 +311,23 @@ def test_the_compiled_engines_forest_is_the_same_on_any_number_of_ranks(in_repo_
     first = run_small_world(1, ["-engine", "rust"])
     for ranks, extra in ((2, []), (4, ["-partition", "scattered", "-shuffle"])):
         assert run_small_world(ranks, extra + ["-engine", "rust"])["fingerprint"] == first["fingerprint"]
+
+
+@needs_rust
+def test_the_rust_world_grows_the_same_forest_as_the_compiled_engine(in_repo_root):
+    # every step in Rust (-engine rust-world) gives exactly the same forest as
+    # world.py doing the steps with the Rust engine's sums (-engine rust)
+    expected = run_small_world(1, ["-engine", "rust"])
+    got = run_small_world(1, ["-engine", "rust-world"])
+    assert got["fingerprint"] == expected["fingerprint"]
+    for mine, theirs in zip(got["cycles"], expected["cycles"]):
+        for name in ("plants", "seeds", "born", "rounds", "deaths"):
+            assert mine[name] == theirs[name], name
+
+
+@needs_rust
+def test_the_rust_world_is_the_same_on_any_number_of_ranks_and_cores(in_repo_root):
+    first = run_small_world(1, ["-engine", "rust-world", "-threads", "1"])
+    for ranks, extra in ((2, ["-threads", "3"]), (3, ["-partition", "curve", "-threads", "2"]),
+                         (4, ["-partition", "scattered", "-shuffle"])):
+        assert run_small_world(ranks, extra + ["-engine", "rust-world"])["fingerprint"] == first["fingerprint"]

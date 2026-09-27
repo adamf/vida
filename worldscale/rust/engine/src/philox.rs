@@ -7,7 +7,7 @@
 //               index (24 bits)
 
 // What each random number is for (the same numbers as philox.py)
-// (1, where a tile's starting seeds land, is only used by the Python code)
+pub const PLACE_START: u32 = 1;
 pub const GERMINATE: u32 = 2;
 pub const FORM_SEED: u32 = 3;
 pub const DISPERSE: u32 = 4;

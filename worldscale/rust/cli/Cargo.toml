@@ -1,0 +1,19 @@
+[package]
+name = "worldscale-cli"
+description = "The worldscale command: Vida's world-scale prototype, all in Rust, on one computer or over MPI"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "worldscale"
+path = "src/main.rs"
+
+[dependencies]
+worldscale-engine = { path = "../engine" }
+rayon = "1"
+# MPI, for running on many computers (needs an MPI library: see README.md)
+mpi = { version = "0.8", optional = true }
+
+[features]
+system-maths = ["worldscale-engine/system-maths"]

@@ -48,7 +48,7 @@ class Settings:
     ###what a run is: the world, the random numbers and how it's split up
     def __init__(self, worldSize=200.0, tileSize=50.0, seedsPerHectare=400.0, rngStart=1,
                  photonLimit=750, partition="strips", rng="addressed", crush="rounds", shuffle=False,
-                 engine="numpy"):
+                 engine="numpy", threads=0):
         self.worldSize = worldSize
         self.tileSize = tileSize
         self.seedsPerHectare = seedsPerHectare
@@ -58,7 +58,17 @@ class Settings:
         self.rng = rng               #addressed, or queue (the old way, for comparison)
         self.crush = crush           #rounds, or sequential (the old way, for comparison)
         self.shuffle = shuffle       #shuffle each rank's rows every cycle (it mustn't matter)
-        self.engine = engine         #numpy (forest.py), or rust (compiled.py)
+        self.engine = engine         #numpy (forest.py), rust (compiled.py's functions) or rust-world (all in Rust)
+        self.threads = threads       #cores per rank for rust-world (0: all of them)
+
+
+def makeWorld(comm, settings, table, worldSettings):
+    ###This rank's share of the world: a TiledWorld, or with -engine
+    ###rust-world, compiled.py's CompiledWorld (every step done in Rust)
+    if settings.engine == "rust-world":
+        from worldscale import compiled
+        return compiled.CompiledWorld(comm, settings, table, worldSettings)
+    return TiledWorld(comm, settings, table, worldSettings)
 
 
 def interleave(values):
@@ -216,6 +226,9 @@ class TiledWorld:
     ###-----------------------------------------------------------------
     ###One cycle
     ###-----------------------------------------------------------------
+
+    def rowCount(self):
+        return len(self.forest)
 
     def timeStep(self, name, started):
         self.timings[name] = self.timings.get(name, 0.0) + time.perf_counter() - started
