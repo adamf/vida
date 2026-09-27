@@ -59,7 +59,7 @@ On the 800 m world (40 cycles, ending with about 253,000 trees and seeds):
 | 4 processes | 6.0 s | 2.6 s |
 | per tree per cycle, grown forest, one core | 9.4 µs | 2.2 µs |
 
-What's left is mostly Vida's own maths (about six `pow` and `log` a plant
+What's left is mostly Vida's own maths (about seven `pow` and `log` a plant
 a cycle, and hundreds of photons for each shaded plant), plus the Python
 that moves trees between steps and the pickled messages between ranks.
 
