@@ -40,6 +40,7 @@ def readOptions(arguments=None):
     parser.add_argument("-rng", default="addressed", choices=["addressed", "queue"], help="addressed random numbers, or the old queue")
     parser.add_argument("-crush", default="rounds", choices=["rounds", "sequential"], help="decide overlaps in rounds, or the old way")
     parser.add_argument("-shuffle", action="store_true", help="shuffle each rank's trees every cycle (it shouldn't matter)")
+    parser.add_argument("-engine", default="numpy", choices=["numpy", "rust"], help="numpy (forest.py) or the compiled Rust engine")
     parser.add_argument("-species", default="Species", help="folder of species files")
     parser.add_argument("-mpi", action="store_true", help="run on MPI (use with mpiexec)")
     parser.add_argument("-json", default=None, help="also write the results to this file")
@@ -55,7 +56,8 @@ def runWorld(comm, options):
     settings = worlds.Settings(worldSize=options.worldSize, tileSize=options.tileSize,
                                seedsPerHectare=options.seedsPerHectare, rngStart=options.rngStart,
                                photonLimit=options.photonLimit, partition=options.partition,
-                               rng=options.rng, crush=options.crush, shuffle=options.shuffle)
+                               rng=options.rng, crush=options.crush, shuffle=options.shuffle,
+                               engine=options.engine)
     theWorld = worlds.TiledWorld(comm, settings, table, species.WorldSettings(vidaFolder))
     cycles = []
     started = time.perf_counter()
@@ -90,7 +92,7 @@ def main():
         comm = comms.SerialComm()
     result = runWorld(comm, options)
     if comm.rank == 0:
-        print("ranks %d, %s tiles, rng %s, crush %s: %.1f s" % (comm.size, options.partition, options.rng, options.crush, result["seconds"]))
+        print("ranks %d, %s tiles, rng %s, crush %s, %s engine: %.1f s" % (comm.size, options.partition, options.rng, options.crush, options.engine, result["seconds"]))
         steps = []
         for name in result["timings"]:
             steps.append("%s %.1f s" % (name, result["timings"][name]))

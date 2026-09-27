@@ -18,6 +18,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Build the world-scale prototype's compiled engine (Rust)
+        run: |
+          pip install maturin
+          maturin build --release -m worldscale/rust/Cargo.toml -o dist
+          pip install dist/worldscale_core-*.whl
       - name: Check every Python file compiles
         run: python -m compileall -q -x '/\.git/' .
       - run: pytest -n auto

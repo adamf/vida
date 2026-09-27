@@ -37,12 +37,31 @@ From the folder with `Vida.py` in it:
 
 Options: `-w` world width (m), `-tile` tile width (m), `-s` starting seeds
 per hectare, `-t` cycles, `-rngstart`, `-photons` (most photons per plant),
-`-partition strips|curve|scattered`, `-shuffle`, and for comparison the old
+`-partition strips|curve|scattered`, `-shuffle`, `-engine numpy|rust`, and for comparison the old
 ways, `-rng queue` and `-crush sequential`. MPI needs `mpi4py` and an MPI
 library (`pip install mpi4py mpich` works on Linux).
 
 The tests (`tests/unit/test_worldscale.py`) run several ranks as threads,
 so they don't need MPI.
+
+## The compiled engine
+
+`-engine rust` does each rank's sums with the Rust code in `rust/` (see
+`rust/README.md` for building it and why Rust). It grows exactly the same
+trees as the numpy engine, with values the same to within one part in a
+billion, and like it gives the same forest on any number of ranks.
+
+On the 800 m world (40 cycles, ending with about 253,000 trees and seeds):
+
+| | numpy | Rust |
+|---|---|---|
+| 1 process | 20.4 s | 6.7 s |
+| 4 processes | 6.0 s | 2.6 s |
+| per tree per cycle, grown forest, one core | 9.4 µs | 2.2 µs |
+
+What's left is mostly Vida's own maths (about six `pow` and `log` a plant
+a cycle, and hundreds of photons for each shaded plant), plus the Python
+that moves trees between steps and the pickled messages between ranks.
 
 ## The model
 
@@ -83,4 +102,6 @@ What's different, and why:
   Vida's sums done on whole columns at once
 - `comm.py`: how ranks talk (one process, threads for the tests, or MPI)
 - `world.py`: tiles, halos, seeds moving between ranks, and the cycle
+- `compiled.py`: the same functions as `forest.py`, done by the Rust engine
+- `rust/`: the Rust engine
 - `run.py`: the command line

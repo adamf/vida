@@ -47,7 +47,8 @@ TILE_BITS = 40   #a tree id is (tile number << 40) | (number born in that tile)
 class Settings:
     ###what a run is: the world, the random numbers and how it's split up
     def __init__(self, worldSize=200.0, tileSize=50.0, seedsPerHectare=400.0, rngStart=1,
-                 photonLimit=750, partition="strips", rng="addressed", crush="rounds", shuffle=False):
+                 photonLimit=750, partition="strips", rng="addressed", crush="rounds", shuffle=False,
+                 engine="numpy"):
         self.worldSize = worldSize
         self.tileSize = tileSize
         self.seedsPerHectare = seedsPerHectare
@@ -57,6 +58,7 @@ class Settings:
         self.rng = rng               #addressed, or queue (the old way, for comparison)
         self.crush = crush           #rounds, or sequential (the old way, for comparison)
         self.shuffle = shuffle       #shuffle each rank's rows every cycle (it mustn't matter)
+        self.engine = engine         #numpy (forest.py), or rust (compiled.py)
 
 
 def interleave(values):
@@ -99,6 +101,14 @@ class TiledWorld:
         self.world = worldSettings
         self.world.worldSize = settings.worldSize
         self.rngStart = settings.rngStart
+        ###which code does each rank's sums: forest.py (numpy) or compiled.py (Rust)
+        if settings.engine == "rust":
+            if settings.rng != "addressed":
+                raise ValueError("the Rust engine only has addressed random numbers")
+            from worldscale import compiled
+            self.kernels = compiled
+        else:
+            self.kernels = trees
         if settings.rng == "addressed":
             self.random = philox.AddressedRandom()
         else:
@@ -138,14 +148,22 @@ class TiledWorld:
         ###tile, so only the 8 tiles round a tree's own can need it.
         if width > self.tileSize:
             raise ValueError("something reaches %.1f m, more than a tile (%.1f m): use bigger tiles (-tile)" % (width, self.tileSize))
-        wanted = [numpy.zeros(len(rows), dtype=bool) for rank in range(self.comm.size)]
-        if len(rows) == 0:
-            return [rows[wanted[rank]] for rank in range(self.comm.size)]
+        nothing = numpy.zeros(0, dtype=numpy.int64)
+        if self.comm.size == 1 or len(rows) == 0:
+            return [nothing for rank in range(self.comm.size)]
+        ###only trees near an edge of their tile can be needed by another rank
         x = self.forest.x[rows]
         y = self.forest.y[rows]
         column, row = self.tileOf(x, y)
         insideX = x + self.half - column * self.tileSize
         insideY = y + self.half - row * self.tileSize
+        nearEdge = (insideX < width) | (insideX > self.tileSize - width) | (insideY < width) | (insideY > self.tileSize - width)
+        rows = rows[nearEdge]
+        column = column[nearEdge]
+        row = row[nearEdge]
+        insideX = insideX[nearEdge]
+        insideY = insideY[nearEdge]
+        wanted = [numpy.zeros(len(rows), dtype=bool) for rank in range(self.comm.size)]
         for across in (-1, 0, 1):
             for up in (-1, 0, 1):
                 if across == 0 and up == 0:
@@ -213,17 +231,17 @@ class TiledWorld:
 
         ###1. germinate and grow, each tree on its own
         wasPlant = numpy.nonzero(~self.forest.isSeed)[0]
-        dying = trees.germinate(self.forest, cycle, table, self.world, self.rngStart, self.random, deaths)
-        grown, mothers, counts, masses = trees.grow(self.forest, wasPlant, table, self.world, deaths)
+        dying = self.kernels.germinate(self.forest, cycle, table, self.world, self.rngStart, self.random, deaths)
+        grown, mothers, counts, masses = self.kernels.grow(self.forest, wasPlant, table, self.world, deaths)
         dying |= grown
-        seeds, motherIds, seedNumbers = trees.disperse(self.forest, mothers, counts, masses, cycle, table, self.world,
+        seeds, motherIds, seedNumbers = self.kernels.disperse(self.forest, mothers, counts, masses, cycle, table, self.world,
                                                        self.rngStart, self.random)
         seeds.id = self.newIds(self.forest.x[numpy.repeat(mothers, counts)], self.forest.y[numpy.repeat(mothers, counts)],
                                motherIds, seedNumbers)
         onWorld = (seeds.x >= -self.half) & (seeds.x < self.half) & (seeds.y >= -self.half) & (seeds.y < self.half)
         deaths[trees.CAUSES[9]] += int((~onWorld).sum())
         seeds = seeds.take(onWorld)
-        self.forest = self.forest.take(~dying)
+        ###(the rows that die here are taken out with step 3's)
         started = self.timeStep("grow", started)
 
         ###2. seeds go to the rank of the tile they land in
@@ -236,20 +254,24 @@ class TiledWorld:
         arrived = []
         for letter in self.comm.alltoall(letters):
             arrived.append(trees.forestFromDict(letter))
-        self.forest = trees.joinForests([self.forest] + arrived)
+        if self.kernels is trees:
+            self.forest = trees.joinForests([self.forest] + arrived)
+        else:
+            self.forest = trees.appendRows(self.forest, trees.joinForests(arrived))
+        dying = numpy.concatenate((dying, numpy.zeros(len(self.forest) - len(dying), dtype=bool)))
         born = len(seeds)
         started = self.timeStep("send seeds", started)
 
         ###3. deaths each tree decides for itself
-        dying = trees.ownDeaths(self.forest, cycle, table, self.world, self.rngStart, self.random, deaths)
-        self.forest = self.forest.take(~dying)
+        dying = self.kernels.ownDeaths(self.forest, dying, cycle, table, self.world, self.rngStart, self.random, deaths)
+        self.dropRows(dying)
         started = self.timeStep("own deaths", started)
 
         ###4. overlapping stems and seeds
         if not self.world.allowOverlaps:
             crushed, rounds = self.crush()
             deaths[trees.CAUSES[7]] += int(crushed.sum())
-            self.forest = self.forest.take(~crushed)
+            self.dropRows(crushed)
         else:
             rounds = 0
         started = self.timeStep("crush", started)
@@ -259,14 +281,23 @@ class TiledWorld:
         started = self.timeStep("shade", started)
 
         ###6. photosynthesis
-        dying = trees.photosynthesise(self.forest, table, deaths)
-        self.forest = self.forest.take(~dying)
+        dying = self.kernels.photosynthesise(self.forest, table, deaths)
+        self.dropRows(dying)
         started = self.timeStep("photosynthesis", started)
 
         if self.settings.shuffle:
             self.forest = self.forest.take(self.shuffler.permutation(len(self.forest)))
         self.cycle = cycle + 1
         return self.summary(deaths, born, rounds)
+
+    def dropRows(self, dying):
+        ###Take out the rows that die. The compiled engine moves the rows
+        ###left to the front of every column in place, without copying.
+        if self.kernels is trees:
+            self.forest = self.forest.take(~dying)
+        else:
+            kept = self.kernels.compact(self.forest, ~dying)
+            self.forest = self.forest.firstRows(kept)
 
     def newIds(self, motherX, motherY, motherIds, seedNumbers):
         ###Ids for seeds born this cycle: each mother's tile numbers its new
@@ -316,17 +347,12 @@ class TiledWorld:
         y = numpy.concatenate((self.forest.y, halo["y"]))
         haloRadius = numpy.where(halo["isSeed"], halo["radiusSeed"], halo["radiusStem"])
         allRadius = numpy.concatenate((radius, haloRadius))
-        first, second = trees.findPairs(x, y, allRadius)
-        place = trees.strongerFirst(numpy.concatenate((self.forest.massTotal, halo["massTotal"])),
-                                    numpy.concatenate((self.forest.birthCycle, halo["birthCycle"])),
-                                    numpy.concatenate((self.forest.id, halo["id"])))
-        firstWins = place[first] < place[second]
-        winner = numpy.where(firstWins, first, second)
-        loser = numpy.where(firstWins, second, first)
-        ###only our own trees' fates are ours to decide
-        mine = loser < count
-        winner = winner[mine]
-        loser = loser[mine]
+        ###each overlapping pair, and which of the two is stronger; only our
+        ###own trees' fates are ours to decide
+        winner, loser = self.kernels.overlapWinners(x, y, allRadius,
+                                                    numpy.concatenate((self.forest.massTotal, halo["massTotal"])),
+                                                    numpy.concatenate((self.forest.birthCycle, halo["birthCycle"])),
+                                                    numpy.concatenate((self.forest.id, halo["id"])), count)
         if self.settings.crush == "sequential":
             return self.crushOneAtATime(winner, loser, count), 1
         UNDECIDED = 0
@@ -390,7 +416,7 @@ class TiledWorld:
         haloCount = len(halo["id"])
         self.traffic["halo copies for shading"] += haloCount
         isPlant = numpy.concatenate((~self.forest.isSeed, numpy.ones(haloCount, dtype=bool)))
-        return trees.shade(count,
+        return self.kernels.shade(count,
                            numpy.concatenate((self.forest.x, halo["x"])),
                            numpy.concatenate((self.forest.y, halo["y"])),
                            numpy.concatenate((self.forest.r, halo["r"])),

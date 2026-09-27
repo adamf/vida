@@ -231,3 +231,83 @@ def test_every_tree_has_its_own_id(in_repo_root):
         assert not (new & seen)
         seen |= new
     assert len(seen) > len(theWorld.forest)
+
+
+# --------------------------------------------------------------------------
+# The compiled engine (worldscale/rust, built with maturin)
+# --------------------------------------------------------------------------
+
+try:
+    from worldscale import compiled as compiled_engine  # noqa: E402
+except ImportError:
+    compiled_engine = None
+needs_rust = pytest.mark.skipif(compiled_engine is None, reason="the Rust engine isn't built (see worldscale/rust)")
+
+
+@needs_rust
+def test_the_compiled_engines_random_numbers_are_the_same():
+    ids = numpy.arange(50000, dtype=numpy.uint64) * numpy.uint64(2654435761) + numpy.uint64(1 << 40)
+    index = numpy.arange(50000) % 750
+    for rngStart in (1, 42, -1, 2**63 + 5):
+        expected = philox.randomBlocks(rngStart, ids, 9, philox.PHOTON, index)
+        assert numpy.array_equal(compiled_engine.randomBlocks(rngStart, ids, 9, philox.PHOTON, index), expected)
+
+
+@needs_rust
+def test_the_compiled_engine_finds_the_same_pairs_and_winners():
+    rng = numpy.random.default_rng(12)
+    for trial in range(5):
+        count = 3000
+        x = rng.uniform(-40, 40, count)
+        y = rng.uniform(-40, 40, count)
+        radius = numpy.where(rng.random(count) < 0.8, rng.uniform(0.0, 0.1, count), rng.uniform(0.1, 6.0, count))
+        radius[:20] = 0.05  # some the same size
+        mass = numpy.round(rng.uniform(1, 20, count))
+        birth = rng.integers(0, 3, count).astype(numpy.int32)
+        ids = rng.permutation(count).astype(numpy.uint64)
+        pairs = []
+        for first, second in (trees.findPairs(x, y, radius), compiled_engine.findPairs(x, y, radius)):
+            found = set()
+            for a, b in zip(first.tolist(), second.tolist()):
+                found.add((min(a, b), max(a, b)))
+            assert len(found) == len(first)
+            pairs.append(found)
+        assert pairs[0] == pairs[1]
+        winners = []
+        for engine in (trees, compiled_engine):
+            winner, loser = engine.overlapWinners(x, y, radius, mass, birth, ids, 2000)
+            winners.append(set(zip(winner.tolist(), loser.tolist())))
+        assert winners[0] == winners[1]
+
+
+def small_world(engine, cycles):
+    table = species.SpeciesTable(species.speciesFilesIn(str(REPO / "Species")), str(REPO))
+    settings = worlds.Settings(worldSize=60.0, tileSize=15.0, photonLimit=200, engine=engine)
+    theWorld = worlds.TiledWorld(comms.SerialComm(), settings, table, species.WorldSettings(str(REPO)))
+    for cycle in range(cycles):
+        theWorld.runCycle()
+    return theWorld.forest
+
+
+@needs_rust
+def test_the_compiled_engine_grows_the_same_trees(in_repo_root):
+    # the same births, deaths and crushes; the values can differ in the last
+    # digits, as its maths functions are its own
+    numpyForest = small_world("numpy", 22)
+    rustForest = small_world("rust", 22)
+    assert len(numpyForest) > 300
+    numpyOrder = numpy.argsort(numpyForest.id)
+    rustOrder = numpy.argsort(rustForest.id)
+    assert numpy.array_equal(numpyForest.id[numpyOrder], rustForest.id[rustOrder])
+    for name in ("x", "y", "massStem", "massLeaf", "massFixed", "heightStem", "r", "areaCovered", "attachedMass"):
+        assert numpy.allclose(getattr(numpyForest, name)[numpyOrder], getattr(rustForest, name)[rustOrder],
+                              rtol=1e-9, atol=1e-12), name
+    for name in ("species", "isSeed", "age", "isMature", "attachedCount", "fixedCount"):
+        assert numpy.array_equal(getattr(numpyForest, name)[numpyOrder], getattr(rustForest, name)[rustOrder]), name
+
+
+@needs_rust
+def test_the_compiled_engines_forest_is_the_same_on_any_number_of_ranks(in_repo_root):
+    first = run_small_world(1, ["-engine", "rust"])
+    for ranks, extra in ((2, []), (4, ["-partition", "scattered", "-shuffle"])):
+        assert run_small_world(ranks, extra + ["-engine", "rust"])["fingerprint"] == first["fingerprint"]

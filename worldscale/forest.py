@@ -94,6 +94,13 @@ class Forest:
             setattr(chosen, name, getattr(self, name)[rows])
         return chosen
 
+    def firstRows(self, count):
+        ###the first `count` rows (views of the same arrays: nothing copied)
+        chosen = Forest(0)
+        for name in self.columnNames():
+            setattr(chosen, name, getattr(self, name)[:count])
+        return chosen
+
     def asDict(self):
         ###the columns, to send to another processor
         columns = {}
@@ -107,6 +114,32 @@ def forestFromDict(columns):
     for name in theForest.columnNames():
         setattr(theForest, name, columns[name])
     return theForest
+
+
+def appendRows(forest, extra):
+    ###forest's rows, then extra's. Where forest's arrays are the start of
+    ###bigger arrays with room to spare (after rows were taken out in place,
+    ###see compiled.compact), extra's rows are written into that room;
+    ###otherwise the arrays are copied into new ones with a quarter more
+    ###room than needed. Either way, nothing else may still be using the
+    ###rows after forest's.
+    count = len(forest)
+    total = count + len(extra)
+    joined = Forest(0)
+    for name in forest.columnNames():
+        column = getattr(forest, name)
+        base = column.base
+        startsTogether = (base is not None and base.dtype == column.dtype and base.ndim == column.ndim
+                          and base.shape[1:] == column.shape[1:]
+                          and base.__array_interface__["data"][0] == column.__array_interface__["data"][0])
+        if startsTogether and len(base) >= total:
+            room = base
+        else:
+            room = numpy.empty((total + total // 4 + 1024,) + column.shape[1:], dtype=column.dtype)
+            room[:count] = column
+        room[count:total] = getattr(extra, name)
+        setattr(joined, name, room[:total])
+    return joined
 
 
 def joinForests(forests):
@@ -443,11 +476,12 @@ def disperse(forest, mothers, counts, masses, cycle, table, world, rngStart, ran
 ###Deaths that each row decides for itself
 ###---------------------------------------------------------------------
 
-def ownDeaths(forest, cycle, table, world, rngStart, random, deaths):
+def ownDeaths(forest, alreadyDying, cycle, table, world, rngStart, random, deaths):
     ###Stems off the world, random death, growing too slowly and buckling
-    ###(Euler-Greenhill), in the order Vida checks them. Gives back the rows
-    ###that die.
-    dying = numpy.zeros(len(forest), dtype=bool)
+    ###(Euler-Greenhill), in the order Vida checks them, for the rows not
+    ###already dying (from germinating or growing this cycle). Gives back
+    ###all the rows that die.
+    dying = alreadyDying.copy()
     if len(forest) == 0:
         return dying
     plant = ~forest.isSeed
@@ -455,7 +489,7 @@ def ownDeaths(forest, cycle, table, world, rngStart, random, deaths):
     if not world.allowOffWorld:
         radius = numpy.where(plant, forest.radiusStem, forest.radiusSeed)
         half = world.worldSize / 2.0
-        off = (forest.x + radius > half) | (forest.x - radius < -half) | (forest.y + radius > half) | (forest.y - radius < -half)
+        off = ~dying & ((forest.x + radius > half) | (forest.x - radius < -half) | (forest.y + radius > half) | (forest.y - radius < -half))
         deaths[CAUSES[3]] += int(off.sum())
         dying |= off
     if world.allowRandomDeath:
@@ -559,6 +593,18 @@ def strongerFirst(massTotal, birthCycle, ids):
     place = numpy.empty(len(order), dtype=numpy.int64)
     place[order] = numpy.arange(len(order))
     return place
+
+
+def overlapWinners(x, y, radius, massTotal, birthCycle, ids, ownedCount):
+    ###Every pair of overlapping circles where the weaker one is among the
+    ###first ownedCount rows: gives back (the stronger's rows, the weaker's).
+    first, second = findPairs(x, y, radius)
+    place = strongerFirst(massTotal, birthCycle, ids)
+    firstWins = place[first] < place[second]
+    winner = numpy.where(firstWins, first, second)
+    loser = numpy.where(firstWins, second, first)
+    mine = loser < ownedCount
+    return winner[mine], loser[mine]
 
 
 def tallerFirst(heightStem, ids):
