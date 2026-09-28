@@ -141,9 +141,17 @@ function buildGrass(state, header, bladeCount) {
   }
   var world = header.worldSize;
   var reach = world / 2 + world * 0.4;
-  state.uniforms.grassReach.value = reach;
   var inner = world / 2 + world * 0.08;
-  var density = bladeCount * 0.8 / (4 * inner * inner);
+  var share = 0.8;
+  if (state.surroundings === "void") {
+    // the world alone: grass right up to its edge, and none beyond
+    reach = world / 2;
+    inner = world / 2;
+    share = 1;
+  }
+  // (the grass only gets shorter towards the reach when there's land beyond)
+  state.uniforms.grassReach.value = state.surroundings === "void" ? world * 10 : reach;
+  var density = bladeCount * share / (4 * inner * inner);
   // sparser grass gets wider blades, so it still covers the ground
   var width = Math.max(0.03, Math.min(0.14, 0.045 * Math.sqrt(70 / density)));
   var random = makeRandom(97);
@@ -156,7 +164,7 @@ function buildGrass(state, header, bladeCount) {
     var y = (random() * 2 - 1) * spread;
     var ground = state.groundHeight(x, y);
     // none on steep slopes, where the ground is bare soil or rock
-    var rise = Math.abs(state.groundHeight(x + 0.4, y) - ground) + Math.abs(state.groundHeight(x, y + 0.4) - ground);
+    var rise = Math.abs(state.surfaceHeight(x + 0.4, y) - ground) + Math.abs(state.surfaceHeight(x, y + 0.4) - ground);
     var steep = smoothStep(0.6, 1.0, rise / 0.4);
     places[i * 3] = x;
     places[i * 3 + 1] = ground - 0.02;

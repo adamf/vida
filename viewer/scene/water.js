@@ -12,6 +12,9 @@
 //     height map);
 //   - ripples drift across it, the sun glints off them, and foam lines the
 //     shore.
+// When the world is shown alone (Surroundings: void), the water stops at
+// the edge of the world, and its sides are drawn where it is deeper than
+// the ground there, like the side of a tank.
 
 "use strict";
 
@@ -137,7 +140,47 @@ function makeWater(state, textures) {
 }
 
 function sizeWater(state, world) {
-  state.water.scale.set(world * 1.6, world * 1.6, 1);
+  var size = state.surroundings === "void" ? world : world * 1.6;
+  state.water.scale.set(size, size, 1);
+}
+
+function updateWaterSides(state) {
+  // The sides of the water at the edge of the world, when it is shown alone:
+  // from the ground up to the water level, wherever the water is deeper
+  // than the ground at the edge.
+  if (state.waterSides) {
+    state.scene.remove(state.waterSides);
+    state.waterSides.geometry.dispose();
+    state.waterSides = null;
+  }
+  if (state.surroundings !== "void" || !state.water.visible) {
+    return;
+  }
+  var level = state.uniforms.waterLevel.value;
+  function top() {
+    return level;
+  }
+  function ground(x, y) {
+    return state.groundHeight(x, y);
+  }
+  // wallGeometry (ground.js) puts each wall's top at the water level and its
+  // bottom at the ground, or at the water level where the ground is higher
+  var geometry = wallGeometry(state.world, state.groundAcross || 200, top, ground);
+  geometry.computeVertexNormals();
+  if (!state.materials.waterSides) {
+    state.materials.waterSides = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(0.03, 0.11, 0.1),
+      roughness: 0.15,
+      metalness: 0,
+      transparent: true,
+      opacity: 0.72,
+      depthWrite: false
+    });
+  }
+  var sides = new THREE.Mesh(geometry, state.materials.waterSides);
+  sides.renderOrder = 1;
+  state.scene.add(sides);
+  state.waterSides = sides;
 }
 
 function renderReflection(state) {

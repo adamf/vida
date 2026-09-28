@@ -104,7 +104,10 @@ Everything else is decoration, to make it look like a real place:
   layered rock and wet mud, dust in the air, birds overhead and fireflies at
   dusk;
 - all round, well away from the simulated world: low hills with woods on
-  them, and blue mountains on the skyline;
+  them, and blue mountains on the skyline. Or, with **Surroundings: none**,
+  nothing at all: the simulated world alone, a block of ground with layered
+  rock sides hanging in the sky, as it is in Vida, where anything that goes
+  past the edge falls off the world;
 - bloom, light shafts through the trees, the ACES filmic curve and a gentle
   colour grade.
 
