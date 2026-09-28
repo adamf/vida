@@ -95,6 +95,7 @@ var SKY_FRAGMENT = [
   "uniform float brightness;",
   "uniform float cloudCover;",
   "uniform vec3 sunColour;",
+  "uniform float voidBelow;",
   "const float pi = 3.141592653589793238462643383279502884197169;",
   "const float rayleighZenithLength = 8.4E3;",
   "const float mieZenithLength = 1.25E3;",
@@ -154,6 +155,10 @@ var SKY_FRAGMENT = [
   "    cloudColour += sunColour * sunSide * 1.2 * daylight;",
   "    colour = mix(colour, cloudColour, cloud * 0.92);",
   "  }",
+  // with no land round the world (Surroundings: void), the sky below the
+  // horizon fades into deep blue, so the world hangs in space
+  "  float belowHorizon = smoothstep(0.0, -0.5, direction.y) * voidBelow;",
+  "  colour = mix(colour, colour * vec3(0.16, 0.2, 0.3), belowHorizon);",
   "  gl_FragColor = vec4(colour * brightness, 1.0);",
   "}"
 ].join("\n");
@@ -171,7 +176,8 @@ function makeSky(state) {
       time: state.uniforms.time,
       brightness: { value: 0.3 },
       cloudCover: { value: 0.6 },
-      sunColour: state.uniforms.sunColour
+      sunColour: state.uniforms.sunColour,
+      voidBelow: { value: 0 }
     },
     vertexShader: SKY_VERTEX,
     fragmentShader: SKY_FRAGMENT,

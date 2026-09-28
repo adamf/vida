@@ -147,7 +147,7 @@ function updateLife(state) {
   var dust = state.dust.material.uniforms;
   dust.centre.value.set(target.x, 0, target.z);
   dust.spread.value = Math.max(20, Math.min(60, state.view ? state.view.distance * 0.8 : 40));
-  state.dust.position.y = state.groundHeight(target.x, -target.z);
+  state.dust.position.y = state.surfaceHeight(target.x, -target.z);
   dust.strength.value = 0.9 * (1 - state.dusk) * state.uniforms.sunColour.value.g;
   var flies = state.fireflies.material.uniforms;
   flies.centre.value.set(target.x, 0, target.z);

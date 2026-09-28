@@ -3,7 +3,9 @@
 // Inside the simulated world the height of the ground comes from the
 // terrain file (to scale). Outside it, where Vida doesn't simulate
 // anything, the land eases into low rolling hills, high enough to hold the
-// water in.
+// water in. Or, with Surroundings: void, there is no land outside at all:
+// the world is a block of ground with rock sides, alone in the sky, as in
+// Vida, where anything that goes past the edge falls off the world.
 //
 // The ground is also darker, and the grass thinner, where the simulation's
 // canopies shade it: the "shade map" is the light that would reach the
@@ -70,6 +72,20 @@ function groundHeightFunction(header, highestWater) {
     var hills = (Math.sin(x * 0.045 + Math.sin(y * 0.03) * 2.1) + Math.sin(y * 0.052 + Math.sin(x * 0.027) * 1.7)) * world * 0.014;
     var eased = h + (surroundings - h) * smoothStep(0, world * 0.28, outside);
     return eased + Math.max(0, hills + world * 0.01) * smoothStep(world * 0.08, world * 0.6, outside);
+  }
+  return height;
+}
+
+function voidHeightFunction(header) {
+  // The height of the ground when the world is shown alone: the terrain
+  // inside the world, and nothing at all outside it.
+  var world = header.worldSize;
+  var inside = terrainHeightFunction(header);
+  function height(x, y) {
+    if (Math.max(Math.abs(x), Math.abs(y)) > world / 2) {
+      return -Infinity;
+    }
+    return inside(x, y);
   }
   return height;
 }
@@ -261,28 +277,40 @@ function shadeLightAtPoint(state, x, y) {
 }
 
 function buildGround(state, header, highestWater) {
-  // the land as one big mesh, the height map the water reads, and the edge
-  // line of the simulated world
+  // the land as one big mesh, the height map the water reads, and either
+  // the land far off and the edge line of the simulated world, or (with
+  // Surroundings: void) the rock sides of the world alone
   var world = header.worldSize;
-  var margin = world * 0.9;
+  var alone = state.surroundings === "void";
+  var margin = alone ? 0 : world * 0.9;
   var size = world + 2 * margin;
   var step = world / 150;
   if (header.terrain) {
     step = Math.max(header.terrain.cellSize / 2, size / 420);
   }
   var across = Math.min(460, Math.ceil(size / step));
-  var height = groundHeightFunction(header, highestWater);
+  var height = alone ? voidHeightFunction(header) : groundHeightFunction(header, highestWater);
+  // groundHeight: the ground, or -Infinity where there is none (beyond the
+  // edge of a world shown alone). surfaceHeight: the same, but level beyond
+  // the edge, for things that follow the ground, such as the point the
+  // camera looks at.
   state.groundHeight = height;
+  state.surfaceHeight = alone ? terrainHeightFunction(header) : height;
   state.groundSize = size;
   var positions = [];
   var uvs = [];
   var indices = [];
+  var lowest = Infinity;
+  var highest = -Infinity;
   for (var j = 0; j <= across; j++) {
     for (var i = 0; i <= across; i++) {
       var x = -size / 2 + i / across * size;
       var y = -size / 2 + j / across * size;
-      positions.push(x, height(x, y), -y);
+      var h = height(x, y);
+      positions.push(x, h, -y);
       uvs.push(x / 2.5, y / 2.5);
+      lowest = Math.min(lowest, h);
+      highest = Math.max(highest, h);
     }
   }
   for (var row = 0; row < across; row++) {
@@ -334,14 +362,23 @@ function buildGround(state, header, highestWater) {
   state.uniforms.heightMap.value = heightMap;
   state.uniforms.heightMapSize.value = size;
 
+  if (state.edge) {
+    state.scene.remove(state.edge);
+    state.edge.geometry.dispose();
+    state.edge = null;
+  }
+  if (alone) {
+    // no land round the world: its rock sides instead
+    removeFarLand(state);
+    buildCliff(state, world, height, across, lowest, highest);
+    return;
+  }
+  removeCliff(state);
+
   // hills, woods and mountains far away all round
   buildFarLand(state, world, size, height(size / 2, 0));
 
   // a faint line round the edge of the simulated world
-  if (state.edge) {
-    state.scene.remove(state.edge);
-    state.edge.geometry.dispose();
-  }
   var edgePoints = [];
   var corners = [[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]];
   for (var k = 0; k < 4; k++) {
@@ -459,12 +496,8 @@ function farCrownGeometry() {
   return ball;
 }
 
-function buildFarLand(state, world, size, baseHeight) {
-  // Decoration beyond the ground, all round: low hills with woods on them,
-  // and a line of mountains further off. None of it is simulated. The hills
-  // and woods fade in the fog, like the rest of the land; the mountains
-  // fade into the haze by their own colours (not the fog), so they stay a
-  // little darker than the sky behind them.
+function removeFarLand(state) {
+  // take the hills, woods and mountains far off out of the scene
   var old = [state.farHills, state.farWoods, state.farMountains];
   function disposeGeometry(part) {
     if (part.geometry) {
@@ -477,6 +510,18 @@ function buildFarLand(state, world, size, baseHeight) {
       old[o].traverse(disposeGeometry);
     }
   }
+  state.farHills = null;
+  state.farWoods = null;
+  state.farMountains = null;
+}
+
+function buildFarLand(state, world, size, baseHeight) {
+  // Decoration beyond the ground, all round: low hills with woods on them,
+  // and a line of mountains further off. None of it is simulated. The hills
+  // and woods fade in the fog, like the rest of the land; the mountains
+  // fade into the haze by their own colours (not the fog), so they stay a
+  // little darker than the sky behind them.
+  removeFarLand(state);
   var near = new THREE.Color(0.1, 0.18, 0.045);
   var far = new THREE.Color(0.15, 0.21, 0.28);
   // the hills start under the edge of the ground, so there is no gap
@@ -573,4 +618,136 @@ function buildFarLand(state, world, size, baseHeight) {
   }
   state.farMountains = ringMesh(mountainRadii, mountainHeight, [foot, ridge], 360, state.materials.farMountains);
   state.scene.add(state.farMountains);
+}
+
+// ---------------------------------------------------------------------------
+// The world alone (Surroundings: void)
+// ---------------------------------------------------------------------------
+
+function makeCliffMaterial(state) {
+  // Rock in layers, with soil just under the ground; the layers wander up
+  // and down a little, as real ones do. cliffTop is the height of the
+  // ground above each point of the side, so the soil follows it.
+  var material = new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0, envMapIntensity: 0.4 });
+  function onBeforeCompile(shader) {
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nattribute float cliffTop;\nvarying vec3 vCliffPlace;\nvarying float vCliffTop;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvCliffPlace = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvCliffTop = cliffTop;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", ["#include <common>", "varying vec3 vCliffPlace;", "varying float vCliffTop;", SCENE_NOISE_GLSL].join("\n"))
+      .replace("#include <map_fragment>", [
+        "vec3 place = vCliffPlace;",
+        "float along = place.x + place.z;",
+        "float below = vCliffTop - place.y;",
+        "float wobble = sceneFbm(vec2(along * 0.08, place.y * 0.25)) - 0.5;",
+        "float grain = sceneFbm(vec2(along * 1.3, place.y * 2.6));",
+        // layers of rock, thick and thin, pale and dark, as real ones are
+        "float layerHeight = place.y + wobble * 1.4;",
+        "float layers = sceneFbm(vec2(along * 0.012, layerHeight * 0.45));",
+        "vec3 rock = mix(vec3(0.15, 0.11, 0.08), vec3(0.32, 0.26, 0.2), smoothstep(0.42, 0.56, layers));",
+        "float thin = sceneNoise(vec2(along * 0.02, layerHeight * 2.3));",
+        "rock = mix(rock, vec3(0.21, 0.18, 0.15), smoothstep(0.68, 0.8, thin) * 0.7);",
+        "rock *= 0.72 + 0.56 * grain;",
+        // soil and roots just under the ground, grass on the very edge
+        "vec3 colour = mix(vec3(0.12, 0.075, 0.04) * (0.8 + 0.4 * grain), rock, smoothstep(0.35, 1.1, below + wobble * 0.5));",
+        "colour = mix(vec3(0.09, 0.17, 0.035), colour, smoothstep(0.0, 0.07, below));",
+        // a little darker towards the bottom, which the sky lights less
+        "colour *= mix(0.55, 1.0, smoothstep(-12.0, 0.0, -below * 0.35));",
+        "diffuseColor.rgb = colour;"
+      ].join("\n"));
+  }
+  material.onBeforeCompile = onBeforeCompile;
+  return material;
+}
+
+function removeCliff(state) {
+  if (state.cliff) {
+    state.scene.remove(state.cliff);
+    state.cliff.geometry.dispose();
+    state.cliff = null;
+  }
+}
+
+function edgePoint(world, side, fraction) {
+  // a point on the edge of the world (Vida's x and y), going round it
+  // anticlockwise seen from above: south, east, north, then west side
+  var corners = [[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]];
+  var from = corners[side];
+  var to = corners[side + 1];
+  return {
+    x: (from[0] + (to[0] - from[0]) * fraction) * world / 2,
+    y: (from[1] + (to[1] - from[1]) * fraction) * world / 2
+  };
+}
+
+function wallGeometry(world, across, topAt, bottomAt) {
+  // Four walls round the edge of the world, facing out: at each point along
+  // the edge, from topAt(x, y) down to bottomAt(x, y). across points per
+  // side, the same as the ground, so the walls meet it with no gaps. Each
+  // point also gets cliffTop, the height of the top there.
+  var positions = [];
+  var tops = [];
+  var indices = [];
+  for (var side = 0; side < 4; side++) {
+    var first = positions.length / 3;
+    for (var s = 0; s <= across; s++) {
+      var point = edgePoint(world, side, s / across);
+      var top = topAt(point.x, point.y);
+      var bottom = Math.min(top, bottomAt(point.x, point.y));
+      positions.push(point.x, top, -point.y, point.x, bottom, -point.y);
+      tops.push(top, top);
+    }
+    for (var k = 0; k < across; k++) {
+      var t0 = first + k * 2;
+      var b0 = t0 + 1;
+      var t1 = t0 + 2;
+      var b1 = t0 + 3;
+      // anticlockwise seen from outside, so the walls face out
+      indices.push(t0, b0, t1, b0, b1, t1);
+    }
+  }
+  var geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("cliffTop", new THREE.Float32BufferAttribute(tops, 1));
+  geometry.setIndex(indices);
+  return geometry;
+}
+
+function buildCliff(state, world, height, across, lowest, highest) {
+  // The sides of the world, from the edge of the ground down to a flat
+  // base, and the base underneath: a block of ground, like a mesa.
+  removeCliff(state);
+  var base = lowest - Math.max(world * 0.1, (highest - lowest) * 0.3 + 3);
+  function top(x, y) {
+    return height(x, y);
+  }
+  function bottom() {
+    return base;
+  }
+  var walls = wallGeometry(world, across, top, bottom);
+  // the base, facing down
+  var positions = Array.prototype.slice.call(walls.getAttribute("position").array);
+  var tops = Array.prototype.slice.call(walls.getAttribute("cliffTop").array);
+  var indices = Array.prototype.slice.call(walls.getIndex().array);
+  var first = positions.length / 3;
+  var half = world / 2;
+  positions.push(-half, base, half, half, base, half, half, base, -half, -half, base, -half);
+  // (deep under the ground, as far as the colour of the rock goes)
+  tops.push(base + 100, base + 100, base + 100, base + 100);
+  indices.push(first, first + 2, first + 1, first, first + 3, first + 2);
+  var geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("cliffTop", new THREE.Float32BufferAttribute(tops, 1));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  walls.dispose();
+  if (!state.materials.cliff) {
+    state.materials.cliff = makeCliffMaterial(state);
+  }
+  var cliff = new THREE.Mesh(geometry, state.materials.cliff);
+  cliff.receiveShadow = true;
+  state.scene.add(cliff);
+  state.cliff = cliff;
+  state.cliffBase = base;
+  state.groundAcross = across;
 }

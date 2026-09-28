@@ -54,9 +54,10 @@ function placeCamera(state) {
     view.target.x + Math.sin(view.azimuth) * flat,
     view.target.y + Math.sin(view.elevation) * view.distance,
     view.target.z + Math.cos(view.azimuth) * flat);
-  // don't go under the ground or the water
+  // don't go under the ground or the water (when the world is shown
+  // alone, there is neither beyond its edge)
   var floor = state.groundHeight(state.camera.position.x, -state.camera.position.z);
-  if (state.water && state.water.visible) {
+  if (state.water && state.water.visible && floor > -Infinity) {
     floor = Math.max(floor, state.uniforms.waterLevel.value);
   }
   if (state.camera.position.y < floor + 0.6) {
@@ -67,7 +68,7 @@ function placeCamera(state) {
 
 function resetView(state, header) {
   var world = header.worldSize;
-  var middle = state.groundHeight(0, 0);
+  var middle = state.surfaceHeight(0, 0);
   // stand further back on a tall, narrow screen, so the whole world fits
   var narrow = Math.sqrt(Math.max(1, 1.2 / state.camera.aspect));
   state.view = {
@@ -121,7 +122,7 @@ function attachControls(state, canvas) {
     var limit = (state.world || 100) * 0.9;
     state.view.target.x = Math.max(-limit, Math.min(limit, state.view.target.x));
     state.view.target.z = Math.max(-limit, Math.min(limit, state.view.target.z));
-    state.view.target.y = state.groundHeight(state.view.target.x, -state.view.target.z) + 2;
+    state.view.target.y = state.surfaceHeight(state.view.target.x, -state.view.target.z) + 2;
   }
   function changed() {
     state.touring = false;
@@ -198,7 +199,8 @@ function attachControls(state, canvas) {
 }
 
 // ---------------------------------------------------------------------------
-// The scene's own controls: time of day, quality, motion and the tour
+// The scene's own controls: time of day, quality, crowns, surroundings,
+// motion and the tour
 // ---------------------------------------------------------------------------
 
 function hoursLabel(hours) {
@@ -223,6 +225,7 @@ function attachSceneControls(state) {
   var motion = document.getElementById("motion-check");
   var tour = document.getElementById("tour-button");
   var crowns = document.getElementById("crown-select");
+  var surroundings = document.getElementById("surroundings-select");
   function applySun() {
     var hours = Number(slider.value);
     label.textContent = overhead.checked ? "overhead" : hoursLabel(hours);
@@ -251,6 +254,13 @@ function attachSceneControls(state) {
       sceneShowCycle(state.lastRun, state.lastCycle, state.lastOptions);
     }
   }
+  if (surroundings) {
+    surroundings.value = state.surroundings;
+    surroundings.addEventListener("change", onSurroundings);
+  }
+  function onSurroundings() {
+    setSurroundings(state, surroundings.value);
+  }
   if (motion) {
     motion.addEventListener("change", onMotion);
   }
@@ -268,6 +278,26 @@ function attachSceneControls(state) {
     updateTourButton(state);
     startLoop(state);
   }
+}
+
+function setSurroundings(state, name) {
+  // "landscape": the land goes on all round the world, with woods and
+  // mountains far off. "void": the simulated world alone, a block of ground
+  // in the sky, as in Vida, where anything that goes past the edge falls off
+  // the world.
+  state.surroundings = name;
+  state.sky.material.uniforms.voidBelow.value = name === "void" ? 1 : 0;
+  state.environmentStale = true;
+  if (state.header) {
+    buildGround(state, state.header, state.highestWater);
+    sizeWater(state, state.world);
+    buildGrass(state, state.header, state.quality.grass);
+    if (state.lastCycle) {
+      sceneShowCycle(state.lastRun, state.lastCycle, state.lastOptions);
+    }
+    placeCamera(state);
+  }
+  requestSceneDraw();
 }
 
 function setSceneQuality(state, name) {
@@ -332,10 +362,12 @@ function sceneStart(box) {
     meshes: {},
     materials: {},
     groundHeight: function flat() { return 0; },
+    surfaceHeight: function flat() { return 0; },
     header: null,
     world: 100,
     tallest: 20,
     crownForms: "genus",
+    surroundings: "landscape",
     crownFormsBySpecies: [],
     dusk: 0,
     moving: true,
@@ -437,6 +469,7 @@ function sceneSetRun(theRun) {
     }
   }
   state.tallest = theRun.tallest || 20;
+  state.highestWater = highestWater;
   buildGround(state, theRun.header, highestWater);
   sizeWater(state, state.world);
   buildGrass(state, theRun.header, state.quality.grass);
@@ -483,6 +516,7 @@ function sceneShowCycle(theRun, cycle, options) {
     state.water.visible = false;
     state.uniforms.waterLevel.value = -1000;
   }
+  updateWaterSides(state);
   requestSceneDraw();
 }
 
