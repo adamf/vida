@@ -522,10 +522,12 @@ function drawSide() {
   var padBottom = 22;
   var width = sheet.width - padLeft - padRight;
   var height = sheet.height - padTop - padBottom;
-  // the same scale across and up, so trees keep their shape, unless the
-  // tallest tree would not fit
+  // Across, the whole width of the world. Up, from the ground to the top of
+  // the tallest plant of the whole run (the top of its stem, plus the ground
+  // under it), rounded up to the next 10 m, so the forest fills the view.
   var scaleX = width / world;
-  var scaleY = Math.min(scaleX, height / (run.tallest * 1.05));
+  var topHeight = Math.max(10, Math.ceil(run.tallest / 10) * 10);
+  var scaleY = height / topHeight;
   function screenX(x) { return padLeft + (x + world / 2) * scaleX; }
   function screenY(z) { return padTop + height - z * scaleY; }
 
@@ -534,9 +536,12 @@ function drawSide() {
   context.fillStyle = cssColour("--muted");
   context.strokeStyle = cssColour("--grid");
   context.lineWidth = 1;
-  var visibleHeight = height / scaleY;
-  var step = niceStep(visibleHeight, 5);
-  for (var h = 0; h <= visibleHeight; h += step) {
+  // (a step that the top height is a whole number of, so the top is labelled)
+  var step = niceStep(topHeight, 5);
+  if (topHeight % step !== 0) {
+    step = topHeight % 20 === 0 ? 20 : 10;
+  }
+  for (var h = 0; h <= topHeight; h += step) {
     var gridY = Math.round(screenY(h)) + 0.5;
     context.beginPath();
     context.moveTo(padLeft, gridY);
