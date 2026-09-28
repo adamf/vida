@@ -41,8 +41,8 @@ into (see [The natural scene](#the-natural-scene)).
   hatched. Regions are outlined.
 - **From the side**: every plant seen from the south, with its stem and a dome
   for its canopy (the top of the dome is the top of the stem, as in Vida's 3D
-  files). Heights and widths use the same scale unless the tallest plant
-  would not fit.
+  files). The height goes up to the tallest plant of the run (its stem top,
+  plus the ground under it), rounded up to the next 10 m.
 - **Plants and seeds** and **Plants by species**: the counts over the whole
   run. Hover to read the numbers, click to jump to that cycle.
 - A table of this cycle's species and causes of death, under **Table view**.
