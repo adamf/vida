@@ -1,0 +1,4 @@
+# Extra packages for Vida's web server (python -m server; see server/README.md):
+#   pip install -r requirements.txt -r requirements-server.txt
+fastapi
+uvicorn

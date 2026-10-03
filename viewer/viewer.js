@@ -10,6 +10,9 @@
 //   drawing        the map from above, the side view and the two charts
 //   scene          the natural scene in 3D (drawn by scene.js)
 //   interaction    play/pause, the slider, hovering, and keyboard keys
+//
+// server.js adds the Simulations panel when the page comes from Vida's web
+// server (python -m server): it starts runs and shows them as they run.
 
 "use strict";
 
@@ -22,6 +25,7 @@ var hoverTargets = {};       // what the pointer can hover over, per canvas
 var viewMode = "plan";       // "plan" (map and side view) or "scene" (3D)
 var sceneReady = false;      // the 3D scene has been set up
 var sceneRun = null;         // the run the 3D scene was last set up for
+var sceneCycleCount = 0;     // how many cycles that run had then
 var chartHover = {};         // the cycle the pointer is over, per chart
 
 // The palette gives three categorical colours (see viewer.css); species past
@@ -45,35 +49,24 @@ var LIGHT_RAMP_DARK = ["#184f95", "#1c5cab", "#256abf", "#2a78d6", "#3987e5",
 function readViewerFile(text) {
   // Turn the text of a viewer.jsonl file into the `run` object.
   var lines = text.split("\n");
-  var header = null;
-  var cycles = [];
-  var species = [];
+  var theRun = null;
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i].trim();
     if (line === "") {
       continue;
     }
     var data = JSON.parse(line);
-    if (header === null) {
-      if (data.format !== "vida-viewer") {
-        throw new Error("This is not a Vida viewer file (made with Vida's -j option).");
-      }
-      header = data;
-      continue;
+    if (theRun === null) {
+      theRun = startRun(data);
+    } else {
+      addCycle(theRun, data);
     }
-    for (var s = 0; s < data.newSpecies.length; s++) {
-      var oneSpecies = data.newSpecies[s];
-      species[oneSpecies.number] = oneSpecies;
-    }
-    cycles.push(data);
   }
-  if (header === null || cycles.length === 0) {
+  if (theRun === null || theRun.cycles.length === 0) {
     throw new Error("The file has no cycles in it.");
   }
-  var newRun = { header: header, cycles: cycles, species: species };
-  summarise(newRun);
-  assignSpeciesColours(newRun);
-  return newRun;
+  assignSpeciesColours(theRun);
+  return theRun;
 }
 
 function field(plant, name) {
@@ -81,44 +74,18 @@ function field(plant, name) {
   return plant[run.fieldIndex[name]];
 }
 
-function summarise(theRun) {
-  // Work out the totals the charts need, once, when the file is loaded.
-  var header = theRun.header;
+function startRun(header) {
+  // A run with no cycles yet, from the first line of the file (the world).
+  // Cycles are added one at a time with addCycle, which also works out the
+  // totals the charts need, so a run can grow while it is shown (when it is
+  // watched from Vida's web server).
+  if (header.format !== "vida-viewer") {
+    throw new Error("This is not a Vida viewer file (made with Vida's -j option).");
+  }
+  var theRun = { header: header, cycles: [], species: [], speciesPlantCycles: [] };
   theRun.fieldIndex = {};
   for (var f = 0; f < header.plantFields.length; f++) {
     theRun.fieldIndex[header.plantFields[f]] = f;
-  }
-  var index = theRun.fieldIndex;
-  theRun.speciesPlantCycles = [];
-  for (var s = 0; s < theRun.species.length; s++) {
-    theRun.speciesPlantCycles.push(0);
-  }
-  theRun.tallest = 1.0;
-  for (var c = 0; c < theRun.cycles.length; c++) {
-    var cycle = theRun.cycles[c];
-    cycle.plantsBySpecies = [];
-    cycle.seedsBySpecies = [];
-    for (var k = 0; k < theRun.species.length; k++) {
-      cycle.plantsBySpecies.push(0);
-      cycle.seedsBySpecies.push(0);
-    }
-    for (var p = 0; p < cycle.plants.length; p++) {
-      var plant = cycle.plants[p];
-      var number = plant[index.species];
-      cycle.plantsBySpecies[number] += 1;
-      theRun.speciesPlantCycles[number] += 1;
-      var top = (plant[index.elevation] || 0) + plant[index.stemHeight];
-      if (top > theRun.tallest) {
-        theRun.tallest = top;
-      }
-    }
-    for (var d = 0; d < cycle.seeds.length; d++) {
-      cycle.seedsBySpecies[cycle.seeds[d][4]] += 1;
-    }
-    cycle.deathCount = 0;
-    for (var cause in cycle.deaths) {
-      cycle.deathCount += cycle.deaths[cause];
-    }
   }
   var terrain = header.terrain;
   theRun.highestGround = 0;
@@ -132,9 +99,58 @@ function summarise(theRun) {
       }
     }
   }
-  if (theRun.highestGround > theRun.tallest) {
-    theRun.tallest = theRun.highestGround;
+  // the top of the tallest plant, or the highest ground if that is higher
+  theRun.tallest = Math.max(1.0, theRun.highestGround);
+  return theRun;
+}
+
+function addSpecies(theRun, oneSpecies) {
+  // A species seen for the first time. Cycles already added get a count of
+  // zero for it. Its colour is given later (see assignSpeciesColours).
+  oneSpecies.slot = -1;
+  theRun.species[oneSpecies.number] = oneSpecies;
+  while (theRun.speciesPlantCycles.length < theRun.species.length) {
+    theRun.speciesPlantCycles.push(0);
   }
+  for (var c = 0; c < theRun.cycles.length; c++) {
+    var cycle = theRun.cycles[c];
+    while (cycle.plantsBySpecies.length < theRun.species.length) {
+      cycle.plantsBySpecies.push(0);
+      cycle.seedsBySpecies.push(0);
+    }
+  }
+}
+
+function addCycle(theRun, cycle) {
+  // Add one cycle (one line of the file) to the run, with its totals.
+  for (var s = 0; s < cycle.newSpecies.length; s++) {
+    addSpecies(theRun, cycle.newSpecies[s]);
+  }
+  var index = theRun.fieldIndex;
+  cycle.plantsBySpecies = [];
+  cycle.seedsBySpecies = [];
+  for (var k = 0; k < theRun.species.length; k++) {
+    cycle.plantsBySpecies.push(0);
+    cycle.seedsBySpecies.push(0);
+  }
+  for (var p = 0; p < cycle.plants.length; p++) {
+    var plant = cycle.plants[p];
+    var number = plant[index.species];
+    cycle.plantsBySpecies[number] += 1;
+    theRun.speciesPlantCycles[number] += 1;
+    var top = (plant[index.elevation] || 0) + plant[index.stemHeight];
+    if (top > theRun.tallest) {
+      theRun.tallest = top;
+    }
+  }
+  for (var d = 0; d < cycle.seeds.length; d++) {
+    cycle.seedsBySpecies[cycle.seeds[d][4]] += 1;
+  }
+  cycle.deathCount = 0;
+  for (var cause in cycle.deaths) {
+    cycle.deathCount += cycle.deaths[cause];
+  }
+  theRun.cycles.push(cycle);
 }
 
 function assignSpeciesColours(theRun) {
@@ -176,11 +192,14 @@ async function loadBytes(buffer, name) {
   showMessage("Reading " + name + "…");
   try {
     var text = await textFromBytes(buffer);
-    run = readViewerFile(text);
+    var newRun = readViewerFile(text);
   } catch (error) {
     showMessage("Could not read " + name + ": " + error.message);
     return;
   }
+  // (no longer watching a run on Vida's web server, if one was; see server.js)
+  stopWatching();
+  run = newRun;
   showMessage("");
   startViewing(name);
 }
@@ -522,10 +541,12 @@ function drawSide() {
   var padBottom = 22;
   var width = sheet.width - padLeft - padRight;
   var height = sheet.height - padTop - padBottom;
-  // the same scale across and up, so trees keep their shape, unless the
-  // tallest tree would not fit
+  // Across, the whole width of the world. Up, from the ground to the top of
+  // the tallest plant of the whole run (the top of its stem, plus the ground
+  // under it), rounded up to the next 10 m, so the forest fills the view.
   var scaleX = width / world;
-  var scaleY = Math.min(scaleX, height / (run.tallest * 1.05));
+  var topHeight = Math.max(10, Math.ceil(run.tallest / 10) * 10);
+  var scaleY = height / topHeight;
   function screenX(x) { return padLeft + (x + world / 2) * scaleX; }
   function screenY(z) { return padTop + height - z * scaleY; }
 
@@ -534,9 +555,12 @@ function drawSide() {
   context.fillStyle = cssColour("--muted");
   context.strokeStyle = cssColour("--grid");
   context.lineWidth = 1;
-  var visibleHeight = height / scaleY;
-  var step = niceStep(visibleHeight, 5);
-  for (var h = 0; h <= visibleHeight; h += step) {
+  // (a step that the top height is a whole number of, so the top is labelled)
+  var step = niceStep(topHeight, 5);
+  if (topHeight % step !== 0) {
+    step = topHeight % 20 === 0 ? 20 : 10;
+  }
+  for (var h = 0; h <= topHeight; h += step) {
     var gridY = Math.round(screenY(h)) + 0.5;
     context.beginPath();
     context.moveTo(padLeft, gridY);
@@ -947,6 +971,11 @@ function drawScene() {
   if (sceneRun !== run) {
     sceneSetRun(run);
     sceneRun = run;
+    sceneCycleCount = run.cycles.length;
+  } else if (sceneCycleCount !== run.cycles.length) {
+    // the run has grown (it is being watched as it runs)
+    sceneUpdateRun(run);
+    sceneCycleCount = run.cycles.length;
   }
   sceneShowCycle(run, run.cycles[cycleIndex],
     { colourBy: colourBy, highlight: highlightSpecies, lightColour: lightColour });
@@ -1188,6 +1217,12 @@ function startViewing(name) {
   document.title = "Vida viewer: " + (run.header.name || name);
   var slider = document.getElementById("cycle-slider");
   slider.max = String(run.cycles.length - 1);
+  fillHighlightSelect();
+  showCycle(0);
+}
+
+function fillHighlightSelect() {
+  // the Highlight menu: all species, then each species, most common first
   var select = document.getElementById("highlight-select");
   select.replaceChildren(makeElement("option", "", "all species"));
   select.firstChild.value = "-1";
@@ -1196,11 +1231,15 @@ function startViewing(name) {
     option.value = String(run.speciesOrder[o]);
     select.appendChild(option);
   }
-  showCycle(0);
+  select.value = String(highlightSpecies);
 }
 
 function onKey(event) {
   if (run === null || event.target.tagName === "SELECT" || event.target.tagName === "INPUT") {
+    return;
+  }
+  // (the space bar presses a button, or opens a section, that has the focus)
+  if (event.key === " " && (event.target.tagName === "BUTTON" || event.target.tagName === "SUMMARY")) {
     return;
   }
   if (event.key === " ") {

@@ -189,5 +189,6 @@ been fixed since, and each now has a scenario that uses the feature.
 Also found, not a crash: in `disperseSeed`, the search for a seed's landing
 point on terrain called `elevationFromPixel(thePixelValue)` without
 `theGarden.maxElevation`, so it used the default 50 m range while the lookup
-just before it used the terrain's real range. Fixed; this changed the
-`terrain_water` recording.
+just before it used the terrain's real range. Fixed, together with the
+direction of the pixel coordinates and the image's pixel range
+(`getPixelRange`); the terrain recordings were re-recorded then.

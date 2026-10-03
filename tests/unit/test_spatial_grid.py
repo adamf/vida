@@ -101,20 +101,18 @@ def expected_overlaps(soil):
     first theIndex objects in the soil, where theIndex is plants done so far."""
     expected = {}
     theIndex = 0
-    last_looked_at = None
     for plant in soil:
         if not plant.isSeed:
             found = []
             for j in range(theIndex):
                 other = soil[j]
-                last_looked_at = other
                 if geometry_utils.checkOverlap(plant.x, plant.y, plant.r, other.x, other.y, other.r) > 0:
                     found.append(other)
             found = list_utils.sort_by_attr(found, "absHeightStem")
             found.reverse()
             expected[id(plant)] = found
             theIndex = theIndex + 1
-    return expected, last_looked_at
+    return expected
 
 
 @pytest.mark.parametrize("rng_start", [4, 5, 6])
@@ -123,7 +121,7 @@ def test_shading_finds_exactly_the_same_overlaps(rng_start):
     soil = []
     for i in range(1500):
         soil.append(ShadeThing(rng, isSeed=rng.random() < 0.3))
-    expected, last_looked_at = expected_overlaps(soil)
+    expected = expected_overlaps(soil)
 
     random.seed(rng_start)
     vworldr.determineShade(ShadeWorld(soil))
@@ -132,12 +130,12 @@ def test_shading_finds_exactly_the_same_overlaps(rng_start):
         if not plant.isSeed:
             assert plant.overlapList == expected[id(plant)]
             if len(plant.overlapList) == 1:
-                # shaded by one other plant: uses the transmittance of the last
-                # object the first step looked at (see determineShade)
+                # shaded by one other plant: the overlap, less what gets
+                # through the covering plant's canopy
                 over = plant.overlapList[0]
                 total = geometry_utils.areaCircle(plant.r)
                 covered = geometry_utils.areaOverlappingCircles(plant.x, plant.y, plant.r, over.x, over.y, over.r)
-                covered = covered - covered * last_looked_at.canopyTransmittance
+                covered = covered - covered * over.canopyTransmittance
                 exposed = (total - covered) / total
                 assert plant.areaCovered == total - total * exposed
 

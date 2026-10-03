@@ -21,6 +21,54 @@
 <main>
   <p id="load-message" class="message" role="status"></p>
 
+  <section id="server-panel" class="card server-panel" hidden>
+    <div class="server-head">
+      <h2>Simulations</h2>
+      <span class="note" id="server-note"></span>
+    </div>
+    <p class="note server-intro">Start a simulation here and watch it grow, a cycle at a time, or pause it, run it
+      a cycle at a time and stop it. Each one is Vida run with <code>-j</code>, just as from the command line,
+      so its Output folder is the same.</p>
+    <details id="new-run" class="new-run">
+      <summary>Start a new simulation</summary>
+      <form id="run-form" class="run-form">
+        <label>Name <input name="name" value="web" autocomplete="off"></label>
+        <label>World size (m) <input name="worldSize" type="number" min="1" step="1"></label>
+        <label>Seeds at the start <input name="seeds" type="number" min="0" step="1"></label>
+        <label>Planted
+          <select name="placement">
+            <option value="random">at random</option>
+            <option value="square">in a square grid</option>
+            <option value="hex">in a hexagonal grid</option>
+          </select>
+        </label>
+        <label>Or plant from a file <select name="placementFile"></select></label>
+        <label>Last cycle <input name="cycles" type="number" min="0" step="1"></label>
+        <label>Stop at a population of <input name="maxPopulation" type="number" min="1" step="1"></label>
+        <label>Random numbers start at <input name="rngStart" type="number" step="1" placeholder="different each run"></label>
+        <label>Shade <select name="shade"></select></label>
+        <label>Event file <select name="eventFile"></select></label>
+        <label>Terrain <select name="terrain"></select></label>
+        <label>Water level (m) <input name="waterLevel" type="number" step="any"></label>
+        <label class="wide">More of Vida's options, as on the command line
+          <input name="extra" autocomplete="off" placeholder="for example  -imax 120 -iscale 0.5"></label>
+        <label class="check"><input name="paused" type="checkbox"> start paused, before the first cycle</label>
+        <p class="note wide" id="species-note"></p>
+        <div class="form-end wide">
+          <button type="submit" class="primary">Start</button>
+          <span class="form-message" id="run-form-message" role="status"></span>
+        </div>
+      </form>
+    </details>
+    <ul id="runs-list" class="runs-list"></ul>
+    <p id="runs-empty" class="note">No simulations started yet.</p>
+    <details id="saved-box" class="saved-box">
+      <summary>Saved simulations</summary>
+      <p class="note">The Output folders here with a viewer.jsonl in them (runs with <code>-j</code>, started here or from the command line), newest first.</p>
+      <ul id="saved-list" class="saved-list"></ul>
+    </details>
+  </section>
+
   <section id="welcome" class="welcome">
     <h2>Watch a Vida simulation</h2>
     <p>Run Vida with <code>-j</code> to save every cycle, for example</p>
@@ -42,6 +90,12 @@
       <button id="play-button" type="button" aria-label="Play">Play</button>
       <input id="cycle-slider" type="range" min="0" max="0" value="0" aria-label="Cycle">
       <span id="cycle-label" class="cycle-label"></span>
+      <span id="live-box" class="live-box" hidden>
+        <span id="live-state" class="state-badge"></span>
+        <button id="live-pause" type="button">Pause run</button>
+        <button id="live-step" type="button">Step</button>
+        <button id="live-stop" type="button">Stop run</button>
+      </span>
       <label>Speed
         <select id="speed-select">
           <option value="2">2 cycles/s</option>
@@ -84,11 +138,17 @@
             <option value="vida">as Vida draws them</option>
           </select>
         </label>
+        <label>Surroundings
+          <select id="surroundings-select">
+            <option value="landscape">hills and mountains</option>
+            <option value="void">none: the world alone</option>
+          </select>
+        </label>
         <label><input id="motion-check" type="checkbox" checked> wind and water</label>
         <button id="tour-button" type="button" aria-pressed="false">Tour</button>
       </div>
       <div class="canvas-box scene-box" id="scene-box"></div>
-      <p class="note scene-note" id="scene-note">Drawn to scale from the simulation: where each plant stands, its stem, the height and width of its crown, the ground and the water. Leaves are darker where a plant got less light, and the ground is darker and the grass thinner where the canopies shade it (straight down, as in Vida). Everything else is decoration: the outline of each crown shaped by its genus (or choose Crowns: as Vida draws them), leaves, bark, grass and flowers, sky, clouds, water, birds, the woods and mountains far off, and the time of day.</p>
+      <p class="note scene-note" id="scene-note">Drawn to scale from the simulation: where each plant stands, its stem, the height and width of its crown, the ground and the water. Leaves are darker where a plant got less light, and the ground is darker and the grass thinner where the canopies shade it (straight down, as in Vida). Everything else is decoration: the outline of each crown shaped by its genus (or choose Crowns: as Vida draws them), leaves, bark, grass and flowers, sky, clouds, water, birds, the woods and mountains far off (or choose Surroundings: none, to see the simulated world alone, as a block of ground in the sky), and the time of day.</p>
     </figure>
 
     <div class="views">
@@ -130,5 +190,6 @@
 <div id="drop-overlay" class="drop-overlay" hidden>Drop viewer.jsonl here</div>
 
 <script src="viewer.js"></script>
+<script src="server.js"></script>
 </body>
 </html>

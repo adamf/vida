@@ -29,6 +29,8 @@ After installing all the dependencies necessary, simply cd to the VIDA folder an
 	
 For more information, including command line options and ways to make species, event files and define planting locations, please see VIDA HOWTO.txt
 
+To watch a simulation cycle by cycle in a web browser, add -j and open the Output folder's viewer.jsonl in viewer/index.html (see viewer/README.md). Or start Vida's web server (python -m server, after pip install -r requirements-server.txt) to start, pause, step, stop and watch simulations from the browser (see server/README.md).
+
 EXAMPLES
 --------
 For more examples, including command line options and ways to make species, event files and define planting locations, please see VIDA HOWTO.txt

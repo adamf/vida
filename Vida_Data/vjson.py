@@ -61,6 +61,9 @@ class ViewerFile(object):
 
     def writeLine(self, data):
         self.theFile.write(json.dumps(data, allow_nan=False) + "\n")
+        ###written to the disk straight away, so a program watching the file
+        ###(Vida's web server) sees each cycle as soon as it is done
+        self.theFile.flush()
 
     def speciesNumber(self, thing, newSpecies):
         ###the number of a plant's or seed's species. The first time a species
@@ -155,13 +158,15 @@ def describeTerrain(theGarden):
     if cells < 1:
         cells = 1
     cellSize = worldSize / float(cells)
+    #the darkest and brightest pixels, which Vida maps to the lowest and highest ground
+    thePixelRange = terrain_utils.getPixelRange(theGarden)
     elevation = []
     for row in range(cells):
         heights = []
         for column in range(cells):
             #Vida finds the pixel under a point by adding worldSize/2 to x and y
             thePixelValue = terrain_utils.getPixelValue(column * cellSize, row * cellSize, theGarden.terrainImage)
-            heights.append(number(terrain_utils.elevationFromPixel(thePixelValue, theGarden.maxElevation), 3))
+            heights.append(number(terrain_utils.elevationFromPixel(thePixelValue, theGarden.maxElevation, thePixelRange), 3))
         elevation.append(heights)
     return {"cells": cells, "cellSize": number(cellSize), "maxElevation": number(theGarden.maxElevation),
             "elevation": elevation}

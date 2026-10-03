@@ -23,6 +23,7 @@ import io
 # else:
 import configparser as ConfigParser
 import pathlib
+import operator
 
 
 import copy
@@ -37,6 +38,7 @@ import vgraphics as outputGraphics
 import list_utils as list_utils
 import vevents
 import vjson
+import vcontrol
 import vsunmap
 import vplacement
 import vsoil
@@ -45,6 +47,10 @@ from dxfwrite import DXFEngine as dxf #pip install dxfwrite #https://pypi.org/pr
 import yaml #pip install PyYAML #https://pypi.org/project/PyYAML/
 
 import progressBarClass
+
+#graphical views that produce 3d model files rather than cfdg/png images
+#STH 2026-0926
+THREE_D_VIEWS = ("dxf", "glb")
 ###append the path to where species are
 sys.path.append("Species")
 
@@ -169,7 +175,7 @@ def formatDataRow(theGarden, plant, causeOfDeath):
             plant.heightStem,plant.heightLeafMax,plant.z,plant.GMs,plant.GMl,
             plant.GMs+plant.GMl,2.0*plant.GRs,plant.GHs,plant.massStem/plant.age,
             plant.massLeaf/plant.age,(plant.massStem+plant.massLeaf)/plant.age,(plant.radiusStem*2)/plant.age,plant.heightStem/plant.age,
-            causeOfDeath,3.14159*plant.radiusLeaf**2-plant.areaCovered, 3.14159*plant.radiusStem**2)
+            causeOfDeath,3.14*plant.radiusLeaf**2-plant.areaCovered, 3.14*plant.radiusStem**2)
     else:
         #seeds have no age, so the averages, functional area and basal area are 0
         theData="%i,%s,%s,%s,%f,%f,%f,%f,%f,%f,%s,%s,%s,%i,%i,%f,%f,%i,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%s,%f,%s \n" % \
@@ -401,7 +407,19 @@ def main():
                 print("      Size is: %s x %s" % (tmp.size[0], tmp.size[1]))
                 print("      Resizing image to %ix%i..." % (theWorldSize, theWorldSize))
             tmp=tmp.resize((theWorldSize,theWorldSize))
-            
+
+            #find the darkest and brightest pixels in the resized image. These
+            #become imin and imax. Use the same channel that elevationFromPixel()
+            #uses (the first one) for colour images
+            #STH 2026-0923
+            if tmp.mode in ("RGB", "RGBA"):
+                theBand = tmp.getchannel(0)
+            else:
+                theBand = tmp
+            theGarden.terrainPixelRange = theBand.getextrema()
+            print("      Terrain image mode: %s" % (tmp.mode))
+            print("      Terrain pixel range: %s - %s (mapped to elevation 0 - (imax-imin)*terrainScale)" % (theGarden.terrainPixelRange[0], theGarden.terrainPixelRange[1]))
+
             #store the image size
             theGarden.terrainImage[1]=tmp.size
             
@@ -418,7 +436,8 @@ def main():
                 tmpPath = os.path.join(terrainFile,'*.xlsx') #assumes file suffix is 'xlsx'
                 matchFiles = sorted(glob.glob(tmpPath)) #sorted so the same file is used on every computer
                 if matchFiles:
-                    #9/28/2020 ET-test of default absMax and absMin values from vida.ini                				
+                    print("      NOTE: values from the xlsx file replace -imax, -imin, and -iscale")
+                    #9/28/2020 ET-test of default absMax and absMin values from vida.ini
                     theExcelFile = matchFiles[0] #no matter what, grab the first item in the list
                     if len(matchFiles)==1:
                         print("      xlsx file found")
@@ -552,10 +571,16 @@ def main():
     if produceGraphics==True: 
         print("     Graphical output will be produced.")
         for aView in graphicalView:
-            if aView=="3d":
-                print("       Graphical output will be 3d.")
+            if aView=="dxf":
+                print("       3d graphical output will be DXF files.")
+            elif aView=="glb":
+                print("       3d graphical output will be GLB files.")
             else:
                 print("       Graphical output will be %s." % (graphicalViewNames[aView][0]))
+        for aView in graphicalView:
+            if aView in THREE_D_VIEWS and terrainFile!=None:
+                print("       Water in 3d output will be drawn as: %s" % (waterStyle))
+                break
         if produceVideo==True:
             print("       Graphical output will include a %s frame/second video." % (framesPerSecond))
 
@@ -599,8 +624,10 @@ def main():
             makeDirectory(baseGraphicsDirectory)
             outputGraphicsDirectoryDict={}
             for aView in graphicalView:
-                if aView=='3d':
+                if aView=='dxf':
                     outputGraphicsDirectory = baseGraphicsDirectory +"DXF/"
+                elif aView=='glb':
+                    outputGraphicsDirectory = baseGraphicsDirectory +"GLB/"
                 else:
                     outputGraphicsDirectory = baseGraphicsDirectory + graphicalViewNames[aView][1]
                 outputGraphicsDirectoryDict[aView]=outputGraphicsDirectory
@@ -630,17 +657,25 @@ def main():
 
         if produceGraphics==True and CFDGtextDict=={}:
             for aView in graphicalView:
-                if aView!="3d":
-                    #Only call this once to save time in making 2d graphics
-                    CFDGtextDict[aView]=outputGraphics.initCFDGText(theGarden, aView, percentTimeStamp, 50.0)
-                else:
+                if aView=="dxf":
                     #Only call this once to save time in making 3d graphics
                     DXFBlockDefs = vdxfGraphics.initDXFBlocks(theGarden)
+                elif aView=="glb":
+                    #Only call this once. Builds the shapes and the terrain mesh
+                    GLBContext = vglbGraphics.initGLB(theGarden)
+                else:
+                    #Only call this once to save time in making 2d graphics
+                    CFDGtextDict[aView]=outputGraphics.initCFDGText(theGarden, aView, percentTimeStamp, 50.0)
         #######
 
         ###-j: save each cycle for the web viewer (viewer/index.html)
         if exportJSON==True:
             viewerFile=vjson.ViewerFile(outputDirectory+"viewer.jsonl", theGarden, vidaVersion)
+
+        ###-control: another program (Vida's web server) can pause, step or stop
+        ###the run, by writing to this file (see vcontrol.py)
+        if controlFile!=None:
+            theControl=vcontrol.Control(controlFile)
 
         cycleNumber=0
         print("\n***Running simulation.***")
@@ -648,6 +683,10 @@ def main():
             theProgressBar= progressBarClass.progressbarClass(maxCycles,"*") #why -1? because index 0. So if total=100, 0-99.
 
         while (theGarden.numbPlants<=maxPopulation and cycleNumber<=maxCycles) and (theGarden.numbPlants+theGarden.numbSeeds)>0:
+            ###-control: wait here while told to pause, and end the run if told to stop
+            if controlFile!=None and not theControl.mayRunCycle(cycleNumber):
+                print("\n***Stopped before cycle %i, as asked.***" % (cycleNumber))
+                break
             ###################################################################################
             ####Experimental scripting event stuff                                            #
             if cycleNumber in eventTimes:
@@ -697,17 +736,22 @@ def main():
             if produceGraphics==True:
                 theView=list(graphicalView)#copy graphicalView list to theView
                 ##############################################################
-                if "3d" in graphicalView:
-                    theIndex=theView.index("3d")
+                if "dxf" in graphicalView:
+                    theIndex=theView.index("dxf")
                     theView.pop(theIndex)
                     ###A init call to generate the blocks and, more importantly
                     ###make the terrain mesh (if needed) should have been called already
                     ###2021-0306 STH
                     dxfObject= dxf.drawing()
                     dxfObject.blocks = DXFBlockDefs.blocks #had problems with assignment overwriting what I want to be immutable STH 2021-0307
-                    theDXFData=vdxfGraphics.makeDXF(theGarden, dxfObject)
+                    theDXFData=vdxfGraphics.makeDXF(theGarden, dxfObject, waterStyle)
                     theFileName= simulationName+str(cycleNumber)
-                    vdxfGraphics.writeDXF(outputGraphicsDirectoryDict["3d"], theFileName, theDXFData)
+                    vdxfGraphics.writeDXF(outputGraphicsDirectoryDict["dxf"], theFileName, theDXFData)
+                if "glb" in graphicalView:
+                    theIndex=theView.index("glb")
+                    theView.pop(theIndex)
+                    theFileName= simulationName+str(cycleNumber)
+                    vglbGraphics.writeGLB(outputGraphicsDirectoryDict["glb"], theFileName, theGarden, GLBContext, waterStyle)
 
                 ##############################################################
                 if len(theView)!=0:
@@ -758,10 +802,12 @@ def main():
 
 
             ########This routine is done in worldBasics.determineShade
-            # ###sort the garden.soil by height of the plants.Ordered shortest to tallest
-            # theGarden.soil= list_utils.sort_by_attr(theGarden.soil, "heightStem")
-            # ###flip the list so it's ordered tallest to shortest
-            # theGarden.soil.reverse()
+            ###sort the garden.soil by absolute height (stem height + elevation) so that
+            ###determineShade(), which only lets a plant be shaded by plants earlier in
+            ###the soil, can't have short plants shading tall ones
+            theGarden.soil.sort(key=operator.attrgetter("absHeightStem"))
+            ###flip the list so it's ordered tallest to shortest
+            theGarden.soil.reverse()
 
             ###work out shading, the way shadingModel (-shade) says:
             ###"classic" or "sunmap" (see vsunmap.py)
@@ -842,7 +888,7 @@ def main():
         ###final graphics calls
         if produceGraphics==True:
              for aView in graphicalView:
-                if aView!="3d":
+                if aView not in THREE_D_VIEWS:
                     print("\nProducing PNG files...")
                     #print outputGraphicsDirectoryDict[aView]
                     outputGraphics.outputPNGs(outputGraphicsDirectoryDict[aView], outputGraphicsDirectoryDict[aView])
@@ -854,7 +900,7 @@ def main():
         if produceVideo==True and produceGraphics==True:
             print("Producing video file...")
             for aView in graphicalView:
-                if aView!="3d":
+                if aView not in THREE_D_VIEWS:
                     outputGraphics.outputMOV(outputGraphicsDirectoryDict[aView], simulationName, framesPerSecond)
                     time.sleep(1)
         print("\n*****Simulation Complete*****\n\n\n\n\n")
@@ -885,6 +931,7 @@ if __name__ == '__main__':
     parser.add_argument('-p', dest='deletePngFiles', action='store_true', required=False, help='Delete png files')
     parser.add_argument('-b', dest='showProgressBar', action='store_true', required=False, help='Show progress bars')
     parser.add_argument('-j', dest='exportJSON', action='store_true', required=False, help='Save each cycle for the web viewer (viewer/index.html)')
+    parser.add_argument('-control', type=str, metavar='file', dest='controlFile', required=False, help='A file another program writes to pause, step or stop the run between cycles (Vida_Data/vcontrol.py; used by the web server)')
     parser.add_argument('-rngstart', type=int, metavar='int', dest='rngStart', required=False, help='Starting value for the random number generator: two runs with the same value and settings give exactly the same results')    
     parser.add_argument('-shade', type=str, dest='shadingModel', required=False, default='classic', choices=['classic', 'sunmap'], help='How shade is worked out: classic (overlap lists and random photons) or sunmap (a map of the sunlight, tallest plants first)')
     parser.add_argument('-shadecell', type=float, metavar='float', dest='sunmapCellSize', required=False, default=0.05, help='Size in meters of the squares of the sunlight map (-shade sunmap)')
@@ -900,14 +947,15 @@ if __name__ == '__main__':
 
 
     #default max and min elevation for a grayscale image given no elevation data)
-    parser.add_argument('-imax', type=int, metavar='int', dest='absMax', required=False, help='Max default elevation value for an imported grayscale terrain image')
-    parser.add_argument('-imin', type=int, metavar='int', dest='absMin', required=False, help='Min default elevation value for an imported grayscale terrain image')
+    parser.add_argument('-imax', type=float, metavar='float', dest='absMax', required=False, help='Elevation of the brightest pixel in an imported grayscale terrain image. Replaced by values from an xlsx file if one is in the terrain folder')
+    parser.add_argument('-imin', type=float, metavar='float', dest='absMin', required=False, help='Elevation of the darkest pixel in an imported grayscale terrain image. Replaced by values from an xlsx file if one is in the terrain folder')
     parser.add_argument('-iscale', type=float, metavar='float', dest='terrainScale', required=False, help='The fractional value (0 to 1) to scale the elevation by')
-    parser.add_argument('-iwater', type=float, metavar='float', dest='waterLevel', required=False, help='Elevation at which water exists on terrain')
+    parser.add_argument('-iwater', type=float, metavar='float', dest='waterLevel', required=False, help='Water level, measured as height above the lowest point of the terrain (the darkest pixel)')
+    parser.add_argument('-iwaterstyle', type=str, dest='waterStyle', required=False, choices=['solid','translucent','none'], help='How water is drawn in dxf/glb output: solid (solid from 0 to the water level), translucent (the same block, but see-through in glb files), or none')
 
     ###options that use a code action
     parser.add_argument('-v', type=int, metavar='int', nargs='?', action=parseAction, dest='produceVideo', required=False, help='Produce a video from images. Optional frames/second')    
-    parser.add_argument('-g', nargs='*', type=str, action=parseAction, dest='produceGraphics', required=False, choices=['b','t','s','ts','st','bs','sb','bt','tb','bts','3d' ], help='Graphical view desired')    
+    parser.add_argument('-g', nargs='*', type=str, action=parseAction, dest='produceGraphics', required=False, choices=['b','t','s','ts','st','bs','sb','bt','tb','bts','dxf','glb' ], help='Graphical view(s) desired. dxf and glb produce 3d model files')    
     # parser.add_argument('-s', type=int, metavar='int', nargs='?', dest='startPopulationSize', action=parseAction, help='Number of seeds to start simulation with')
     parser.add_argument('-s', type=int, metavar='int', nargs='?', dest='startPopulationSize', action=parseAction, help='Number of seeds to start simulation with, planted randomly')
     parser.add_argument('-ss', type=int, metavar='int', nargs='?', dest='startPopulationSize', action=parseAction, help='Number of seeds to start simulation with, planted in a square')
@@ -936,14 +984,12 @@ if __name__ == '__main__':
     ###parse the graphic options a bit more
     if type(produceGraphics)==list:
         graphicalView=produceGraphics[1]
-        if "3d" in graphicalView:
-            import vdxfGraphics
         produceGraphics=produceGraphics[0]    
     if type(graphicalView)!=list:
         graphicalView=[graphicalView]#make sure the graphicalView is a list
     #now convert the letter code into the number code used
     for i in range(len(graphicalView)):
-        if graphicalView[i]!='3d':
+        if graphicalView[i] not in THREE_D_VIEWS:
             graphicalView[i]=graphicalView[i].replace('b','1')
             graphicalView[i]=graphicalView[i].replace('t','2')
             graphicalView[i]=graphicalView[i].replace('s','3')
@@ -952,6 +998,13 @@ if __name__ == '__main__':
             graphicalView[i]=graphicalView[i].replace('32','23')
             graphicalView[i]=int(graphicalView[i])
     graphicalView=list_utils.remove_duplicates(graphicalView)
+    if "dxf" in graphicalView:
+        import vdxfGraphics
+    if "glb" in graphicalView:
+        import vglbGraphics
+    if waterStyle not in ("solid", "translucent", "none"):
+        print("***Warning: waterStyle '%s' not recognised. Using 'solid'" % (waterStyle))
+        waterStyle="solid"
     
     ###parse the video options a bit more
     if type(produceVideo)==list:
@@ -962,8 +1015,12 @@ if __name__ == '__main__':
             print("***Warning: A video output was desired, but a graphical option was not specified\n   Graphical output has been set to the default")
             produceGraphics=True
             graphicalView=[theDefaults['graphicalView']]
-        if graphicalView==['3d']:
-            print("***Warning: A video can not be auto generated from the '3d' graphical option\n   Video output turned off")
+        onlyThreeD=True
+        for aView in graphicalView:
+            if aView not in THREE_D_VIEWS:
+                onlyThreeD=False
+        if onlyThreeD:
+            print("***Warning: A video can not be auto generated from the 'dxf' or 'glb' graphical options\n   Video output turned off")
             produceVideo=False
 
     ##parse resume sim option a bit more
