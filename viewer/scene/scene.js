@@ -460,14 +460,7 @@ function sceneSetRun(theRun) {
   state.header = theRun.header;
   state.world = theRun.header.worldSize;
   state.uniforms.worldSize.value = state.world;
-  var highestWater = 0;
-  if (theRun.header.terrain) {
-    for (var c = 0; c < theRun.cycles.length; c++) {
-      if (theRun.cycles[c].waterLevel !== null && theRun.cycles[c].waterLevel > highestWater) {
-        highestWater = theRun.cycles[c].waterLevel;
-      }
-    }
-  }
+  var highestWater = highestWaterOf(theRun);
   state.tallest = theRun.tallest || 20;
   state.highestWater = highestWater;
   buildGround(state, theRun.header, highestWater);
@@ -492,6 +485,39 @@ function sceneSetRun(theRun) {
   state.camera.updateProjectionMatrix();
   setSceneSun(state, state.sunHours === undefined ? 10.5 : state.sunHours);
   resetView(state, theRun.header);
+}
+
+function highestWaterOf(theRun) {
+  // the highest the water gets in the run (0 without terrain)
+  var highestWater = 0;
+  if (theRun.header.terrain) {
+    for (var c = 0; c < theRun.cycles.length; c++) {
+      if (theRun.cycles[c].waterLevel !== null && theRun.cycles[c].waterLevel > highestWater) {
+        highestWater = theRun.cycles[c].waterLevel;
+      }
+    }
+  }
+  return highestWater;
+}
+
+function sceneUpdateRun(theRun) {
+  // The run has grown since sceneSetRun (it is being watched as it runs, from
+  // Vida's web server): there may be new species, taller plants or higher
+  // water. The ground is only built again if the water has gone higher.
+  if (scene3d === null) {
+    return;
+  }
+  var state = scene3d;
+  state.tallest = theRun.tallest || 20;
+  setTreeSpecies(state, theRun);
+  var highestWater = highestWaterOf(theRun);
+  if (highestWater > state.highestWater) {
+    state.highestWater = highestWater;
+    state.environmentStale = true;
+    buildGround(state, state.header, highestWater);
+    sizeWater(state, state.world);
+    buildGrass(state, state.header, state.quality.grass);
+  }
 }
 
 function sceneShowCycle(theRun, cycle, options) {

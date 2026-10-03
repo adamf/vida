@@ -61,6 +61,9 @@ class ViewerFile(object):
 
     def writeLine(self, data):
         self.theFile.write(json.dumps(data, allow_nan=False) + "\n")
+        ###written to the disk straight away, so a program watching the file
+        ###(Vida's web server) sees each cycle as soon as it is done
+        self.theFile.flush()
 
     def speciesNumber(self, thing, newSpecies):
         ###the number of a plant's or seed's species. The first time a species

@@ -30,6 +30,41 @@ python -m http.server
 and go to <http://localhost:8000>. A file can be opened straight away with
 `http://localhost:8000/?data=path/to/viewer.jsonl`.
 
+## Watching a simulation as it runs
+
+Vida's web server (see `server/README.md`) runs Vida for you and serves
+this page. From the folder with `Vida.py` in it:
+
+```
+pip install -r requirements-server.txt
+python -m server
+```
+
+and go to <http://127.0.0.1:8000>. The page then has a **Simulations**
+panel at the top:
+
+- **Start a new simulation**: the usual options in a form. Boxes left empty
+  use Vida.ini's settings, shown in grey. Each run is Vida with `-j`, as from
+  the command line, so its `Output-` folder is the same.
+- The runs, with how far each has got: **Watch** shows one in the viewer,
+  each cycle as soon as Vida has saved it. While the newest cycle is on show,
+  each new one replaces it; go back to an earlier cycle and it stays there.
+  **Pause** stops it after the cycle it is on, **Step** runs one more cycle,
+  **Resume** carries on and **Stop** ends it (Vida still saves what it saves
+  at the end). The same buttons are beside the slider while you watch it.
+  **Log** shows what Vida printed.
+- **Saved simulations**: every `Output-` folder with a `viewer.jsonl` in it,
+  from the server or from the command line, to open in the viewer.
+
+While a run is being watched, each species keeps the colour it was given
+when it first appeared (the first three to appear get the colours), so
+nothing changes colour as the run goes on. A finished file opened with
+**Open viewer.jsonl…** gives the colours to the three most common species
+instead.
+
+`http://127.0.0.1:8000/?run=forest` watches the run called forest straight
+away.
+
 ## What it shows
 
 Choose **View** to switch between the map and side view (below) and the
@@ -147,9 +182,10 @@ gzip -9 -n -c Output-sample/viewer.jsonl > viewer/sample/viewer.jsonl.gz
 ## Changing it
 
 - `index.html` is the layout, `viewer.css` the colours and spacing,
-  `scene/` the natural scene, and `viewer.js` everything else. The
-  sections of `viewer.js` and the files in `scene/` are listed at their
-  tops.
+  `scene/` the natural scene, `server.js` the Simulations panel (only
+  shown when the page comes from Vida's web server), and `viewer.js`
+  everything else. The sections of `viewer.js` and `server.js`, and the
+  files in `scene/`, are listed at their tops.
 - All colours are set once, at the top of `viewer.css`, for the light and
   the dark theme.
 - Anything new in the file should be added to `vjson.py` and to the list of

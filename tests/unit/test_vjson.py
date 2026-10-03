@@ -86,6 +86,16 @@ def test_viewer_file(tmp_path):
     assert second["cycle"] == 4
 
 
+def test_each_cycle_is_on_the_disk_straight_away(tmp_path):
+    # the web server reads the file while Vida is still writing it
+    world = World()
+    viewer = vjson.ViewerFile(tmp_path / "viewer.jsonl", world, "test")
+    assert len((tmp_path / "viewer.jsonl").read_text().splitlines()) == 1
+    viewer.writeCycle(world)
+    assert len((tmp_path / "viewer.jsonl").read_text().splitlines()) == 2
+    viewer.close()
+
+
 def test_numbers_that_json_cannot_hold_become_null():
     assert vjson.number(float("nan")) is None
     assert vjson.number(float("inf")) is None

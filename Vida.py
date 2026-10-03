@@ -37,6 +37,7 @@ import vgraphics as outputGraphics
 import list_utils as list_utils
 import vevents
 import vjson
+import vcontrol
 import vsunmap
 import vplacement
 
@@ -658,12 +659,21 @@ def main():
         if exportJSON==True:
             viewerFile=vjson.ViewerFile(outputDirectory+"viewer.jsonl", theGarden, vidaVersion)
 
+        ###-control: another program (Vida's web server) can pause, step or stop
+        ###the run, by writing to this file (see vcontrol.py)
+        if controlFile!=None:
+            theControl=vcontrol.Control(controlFile)
+
         cycleNumber=0
         print("\n***Running simulation.***")
         if not showProgressBar:
             theProgressBar= progressBarClass.progressbarClass(maxCycles,"*") #why -1? because index 0. So if total=100, 0-99.
 
         while (theGarden.numbPlants<=maxPopulation and cycleNumber<=maxCycles) and (theGarden.numbPlants+theGarden.numbSeeds)>0:
+            ###-control: wait here while told to pause, and end the run if told to stop
+            if controlFile!=None and not theControl.mayRunCycle(cycleNumber):
+                print("\n***Stopped before cycle %i, as asked.***" % (cycleNumber))
+                break
             ###################################################################################
             ####Experimental scripting event stuff                                            #
             if cycleNumber in eventTimes:
@@ -908,6 +918,7 @@ if __name__ == '__main__':
     parser.add_argument('-p', dest='deletePngFiles', action='store_true', required=False, help='Delete png files')
     parser.add_argument('-b', dest='showProgressBar', action='store_true', required=False, help='Show progress bars')
     parser.add_argument('-j', dest='exportJSON', action='store_true', required=False, help='Save each cycle for the web viewer (viewer/index.html)')
+    parser.add_argument('-control', type=str, metavar='file', dest='controlFile', required=False, help='A file another program writes to pause, step or stop the run between cycles (Vida_Data/vcontrol.py; used by the web server)')
     parser.add_argument('-rngstart', type=int, metavar='int', dest='rngStart', required=False, help='Starting value for the random number generator: two runs with the same value and settings give exactly the same results')    
     parser.add_argument('-shade', type=str, dest='shadingModel', required=False, default='classic', choices=['classic', 'sunmap'], help='How shade is worked out: classic (overlap lists and random photons) or sunmap (a map of the sunlight, tallest plants first)')
     parser.add_argument('-shadecell', type=float, metavar='float', dest='sunmapCellSize', required=False, default=0.05, help='Size in meters of the squares of the sunlight map (-shade sunmap)')

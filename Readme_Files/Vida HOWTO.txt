@@ -114,6 +114,7 @@ OPTION SUMMARY
 		-m <integer>		stop early if the population reaches this size
 		-x <integer>		run the whole simulation this many times
 		-rngstart <integer>	starting value for the random numbers: two runs with the same value and settings give exactly the same results
+		-control <file>		a file another program writes to pause, step or stop the run between cycles (the web server uses it; see Vida_Data/vcontrol.py)
 		-b					show progress bars
 		-d					turn on basic debugging messages
 		-dd					turn on detailed debugging messages
@@ -229,6 +230,13 @@ BASIC USAGE
 		python tools/run_many.py -rngstarts 1-8 -jobs 4 -- -n example9 -w 100 -s 10 -t 200 -m 550
 
 		The -x repeats of example 8 run one after another. To use every core of the computer instead, tools/run_many.py runs several simulations at once, each as its own copy of Vida, so each gives exactly the same results as it would on its own. This runs example 1 (without the images) eight times, with -rngstart 1 to 8, four at a time, in folders named "Output-example9-rng1" and so on, with what each prints saved in "Output-example9-rng1.log". It can also run a list of different simulations from a file; see python tools/run_many.py -h.
+
+	Example 10: running and watching simulations from a web browser
+
+		pip install -r requirements-server.txt
+		python -m server
+
+		Starts Vida's web server. Go to http://127.0.0.1:8000 in a web browser: from there you can start simulations, watch each one grow a cycle at a time as it runs, pause it, run it a cycle at a time, stop it, and open any saved run that used -j. Each run is Vida run with -j, just as from the command line, so its Output folder is the same and it gives the same results. Other programs can do the same through the server's API (http://127.0.0.1:8000/docs). See server/README.md.
 
 
 GRAPHICS, VIDEOS AND 3D FILES

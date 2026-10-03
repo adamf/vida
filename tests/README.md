@@ -1,9 +1,11 @@
 # Tests
 
 ```sh
-pip install -r requirements.txt -r requirements-dev.txt
+pip install -r requirements.txt -r requirements-dev.txt -r requirements-server.txt
 pytest -n auto
 ```
+
+(Without `requirements-server.txt`, the web server's tests are skipped.)
 
 * `unit/` checks individual functions: the geometry helpers, reading
   heights from a terrain image, and the growth equations in `vplantr.py`.
